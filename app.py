@@ -560,77 +560,83 @@ if page_choice == "📰 Positive News Screener":
         unique_sectors = sorted(df_screener["Sector"].unique())
         
         if unique_sectors:
-            sector_tabs = st.tabs(unique_sectors)
+            # Dropdown for sector filtering
+            filter_options = ["All Sectors"] + unique_sectors
+            selected_filter = st.selectbox("Filter by Sector:", filter_options)
             
-            for tab_idx, sector_name in enumerate(unique_sectors):
-                with sector_tabs[tab_idx]:
-                    # Filter screener dataframe to this sector
-                    df_sector = df_screener[df_screener["Sector"] == sector_name].reset_index(drop=True)
-                    df_sector["Rank"] = df_sector.index + 1
-                    
-                    st.write(f"Showing positive sentiment stocks in the **{sector_name}** sector:")
-                    
-                    # Responsive Card Layout for Screener Rows inside tab
-                    for idx, row in df_sector.iterrows():
-                        ticker_symbol = row["Ticker"]
+            # Filter screener dataframe based on selection
+            if selected_filter == "All Sectors":
+                df_sector = df_screener.copy().reset_index(drop=True)
+                st.write("Showing positive sentiment stocks across **All Sectors**:")
+            else:
+                df_sector = df_screener[df_screener["Sector"] == selected_filter].reset_index(drop=True)
+                st.write(f"Showing positive sentiment stocks in the **{selected_filter}** sector:")
+                
+            df_sector["Rank"] = df_sector.index + 1
+            
+            # Responsive Card Layout for Screener Rows
+            for idx, row in df_sector.iterrows():
+                ticker_symbol = row["Ticker"]
+                # Create a unique key for the button to avoid duplication errors across filters
+                sector_key = row['Sector'].replace(' ', '_')
+                
+                with st.container(border=True):
+                    c_header, c_action = st.columns([3, 1])
+                    with c_header:
+                        st.markdown(f"#### #{row['Rank']} [{ticker_symbol}](https://finance.yahoo.com/quote/{ticker_symbol}) - {row['Company Name']}")
+                    with c_action:
+                        if st.button("🪄 Analyze", key=f"btn_llm_{ticker_symbol}_{sector_key}", use_container_width=True):
+                            if not llm_key or llm_key.strip() == "":
+                                st.error("LLM Key is missing from the .env file.")
+                            else:
+                                ticker_articles = sentiment_map[ticker_symbol]["articles"]
+                                with st.spinner(f"🤖 Analyzing {ticker_symbol}..."):
+                                    try:
+                                        res = analyze_sentiment_with_llm(
+                                            ticker=ticker_symbol,
+                                            articles_list=ticker_articles,
+                                            provider=llm_provider,
+                                            api_key=llm_key,
+                                            model=llm_model,
+                                            endpoint=llm_endpoint if llm_endpoint.strip() else None
+                                        )
+                                        st.session_state.llm_scores[ticker_symbol] = res["score"]
+                                        st.session_state.llm_reasoning[ticker_symbol] = res["reasoning"]
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error(f"Analysis failed: {str(e)}")
+                                        
+                    c_stat1, c_stat2, c_stat3 = st.columns(3)
+                    with c_stat1:
+                        st.write(f"**Keyword Score:** `{row['Keyword Score']:+d}`")
+                    with c_stat2:
+                        score_val = st.session_state.llm_scores.get(ticker_symbol, "Pending")
+                        if isinstance(score_val, float):
+                            color = "#10B981" if score_val > 0.15 else "#EF4444" if score_val < -0.15 else "#9CA3AF"
+                            st.markdown(f"**LLM Score:** <span style='color:{color}; font-weight:600;'>{score_val:+.2f}</span>", unsafe_allow_html=True)
+                        else:
+                            st.write(f"**LLM Score:** _{score_val}_")
+                    with c_stat3:
+                        st.caption(f"**Keywords:** {row['Matched Keywords']}")
                         
-                        with st.container(border=True):
-                            c_header, c_action = st.columns([3, 1])
-                            with c_header:
-                                st.markdown(f"#### #{row['Rank']} [{ticker_symbol}](https://finance.yahoo.com/quote/{ticker_symbol}) - {row['Company Name']}")
-                            with c_action:
-                                if st.button("🪄 Analyze", key=f"btn_llm_{ticker_symbol}_{sector_name.replace(' ', '_')}", use_container_width=True):
-                                    if not llm_key or llm_key.strip() == "":
-                                        st.error("LLM Key is missing from the .env file.")
-                                    else:
-                                        ticker_articles = sentiment_map[ticker_symbol]["articles"]
-                                        with st.spinner(f"🤖 Analyzing {ticker_symbol}..."):
-                                            try:
-                                                res = analyze_sentiment_with_llm(
-                                                    ticker=ticker_symbol,
-                                                    articles_list=ticker_articles,
-                                                    provider=llm_provider,
-                                                    api_key=llm_key,
-                                                    model=llm_model,
-                                                    endpoint=llm_endpoint if llm_endpoint.strip() else None
-                                                )
-                                                st.session_state.llm_scores[ticker_symbol] = res["score"]
-                                                st.session_state.llm_reasoning[ticker_symbol] = res["reasoning"]
-                                                st.rerun()
-                                            except Exception as e:
-                                                st.error(f"Analysis failed: {str(e)}")
-                                                
-                            c_stat1, c_stat2, c_stat3 = st.columns(3)
-                            with c_stat1:
-                                st.write(f"**Keyword Score:** `{row['Keyword Score']:+d}`")
-                            with c_stat2:
-                                score_val = st.session_state.llm_scores.get(ticker_symbol, "Pending")
-                                if isinstance(score_val, float):
-                                    color = "#10B981" if score_val > 0.15 else "#EF4444" if score_val < -0.15 else "#9CA3AF"
-                                    st.markdown(f"**LLM Score:** <span style='color:{color}; font-weight:600;'>{score_val:+.2f}</span>", unsafe_allow_html=True)
-                                else:
-                                    st.write(f"**LLM Score:** _{score_val}_")
-                            with c_stat3:
-                                st.caption(f"**Keywords:** {row['Matched Keywords']}")
-                                
-                            # Render LLM Reasoning card if analyzed
-                            if ticker_symbol in st.session_state.llm_scores:
-                                score_val = st.session_state.llm_scores[ticker_symbol]
-                                reasoning_val = st.session_state.llm_reasoning[ticker_symbol]
-                                
-                                badge_style = "sentiment-bullish" if score_val > 0.15 else "sentiment-bearish" if score_val < -0.15 else "sentiment-neutral"
-                                st.markdown(
-                                    f"""<div class="ai-analysis-card" style="margin-top: 10px; margin-bottom: 5px;">
-                                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                                            <strong style="font-size:0.9rem; color:#FFFFFF;">🤖 LLM Report:</strong>
-                                            <span class="sentiment-badge {badge_style}">Score: {score_val:+.2f}</span>
-                                        </div>
-                                        <p style="margin:0; font-size:0.85rem; color:#F8FAFC; line-height:1.3;">
-                                            {reasoning_val}
-                                        </p>
-                                    </div>""",
-                                    unsafe_allow_html=True
-                                )
+                    # Render LLM Reasoning card if analyzed
+                    if ticker_symbol in st.session_state.llm_scores:
+                        score_val = st.session_state.llm_scores[ticker_symbol]
+                        reasoning_val = st.session_state.llm_reasoning[ticker_symbol]
+                        
+                        badge_style = "sentiment-bullish" if score_val > 0.15 else "sentiment-bearish" if score_val < -0.15 else "sentiment-neutral"
+                        st.markdown(
+                            f"""<div class="ai-analysis-card" style="margin-top: 10px; margin-bottom: 5px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                    <strong style="font-size:0.9rem; color:#FFFFFF;">🤖 LLM Report:</strong>
+                                    <span class="sentiment-badge {badge_style}">Score: {score_val:+.2f}</span>
+                                </div>
+                                <p style="margin:0; font-size:0.85rem; color:#F8FAFC; line-height:1.3;">
+                                    {reasoning_val}
+                                </p>
+                            </div>""",
+                            unsafe_allow_html=True
+                        )
                             
                         st.markdown('<hr style="margin: 8px 0; border: none; border-top: 1px solid rgba(255,255,255,0.04);"/>', unsafe_allow_html=True)
 
