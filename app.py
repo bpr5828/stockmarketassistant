@@ -156,13 +156,58 @@ st.markdown("""
 # CONFIGURATION & STATIC PARAMETERS
 # ==============================================================================
 
-BENCHMARK_TICKERS = [
-    "AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "BRK-B", "LLY", "AVGO", "JPM",
-    "TSLA", "V", "UNH", "MA", "XOM", "JNJ", "HD", "PG", "COST", "ORCL",
-    "ABBV", "AMD", "MRK", "CVX", "ADBE", "NFLX", "CRM", "BAC", "WMT", "ACN",
-    "TMO", "PEP", "KO", "DIS", "ABT", "QCOM", "WFC", "INTC", "INTU", "MCD",
-    "GE", "AMAT", "CAT", "TXN", "VZ", "MS", "AMGN", "HON", "PM", "AXP"
-]
+# Authentication setup
+allowed_users_str = os.getenv("ALLOWED_USERS", "")
+ALLOWED_USERS = [email.strip().lower() for email in allowed_users_str.split(",") if email.strip()]
+
+# Replace single BENCHMARK_TICKERS list with a 220+ ticker map grouped by sector
+BENCHMARK_SECTORS = {
+    "Technology": ["AAPL", "MSFT", "NVDA", "AVGO", "ORCL", "ADBE", "CRM", "AMD", "QCOM", "INTU", "IBM", "AMAT", "NOW", "TXN", "INTC", "PANW", "MU", "ADI", "LRCX", "KLAC"],
+    "Healthcare": ["LLY", "UNH", "JNJ", "ABBV", "MRK", "TMO", "ABT", "DHR", "ISRG", "PFE", "SYK", "VRTX", "BMY", "BSX", "MDT", "ELV", "GILD", "ZTS", "CVS", "CI"],
+    "Financials": ["BRK-B", "JPM", "V", "MA", "BAC", "WFC", "MS", "AXP", "GS", "SPGI", "C", "SCHW", "BLK", "MMC", "CB", "PGR", "CME", "ICE", "AIG", "TRV"],
+    "Consumer Discretionary": ["AMZN", "TSLA", "HD", "MCD", "NKE", "SBUX", "LOW", "BKNG", "TJX", "MAR", "CMG", "ORLY", "HLT", "AZO", "LVS", "ROST", "YUM", "DHI", "TSCO", "F"],
+    "Communication Services": ["META", "GOOGL", "GOOG", "NFLX", "DIS", "CMCSA", "VZ", "T", "CHTR", "TMUS", "ATVI", "EA", "WBD", "FOXA", "NWS", "PARA", "LYV", "OMC", "IPG", "MTCH"],
+    "Industrials": ["CAT", "GE", "HON", "UNP", "BA", "UPS", "RTX", "LMT", "DE", "ETN", "ADP", "CSX", "EMR", "NSC", "GD", "PCAR", "CMI", "ROP", "PH", "TDG"],
+    "Consumer Staples": ["PG", "COST", "WMT", "PEP", "KO", "PM", "MDLZ", "MO", "TGT", "KHC", "HSY", "MNST", "STZ", "ADM", "GIS", "K", "SYY", "CL", "KMB", "EL"],
+    "Energy": ["XOM", "CVX", "COP", "EOG", "SLB", "MPC", "PSX", "VLO", "OXY", "WMB", "HES", "KMI", "BKR", "HAL", "DVN", "TRGP", "CTRA", "FANG", "MRO", "OKE"],
+    "Utilities": ["NEE", "SO", "DUK", "SRE", "AEP", "D", "EXC", "PCG", "ED", "XEL", "PEG", "WEC", "AWK", "ETR", "ES", "FE", "CMS", "AEE", "LNT", "NI"],
+    "Real Estate": ["PLD", "AMT", "EQIX", "CCI", "PSA", "O", "SPG", "WELL", "DLR", "VTR", "AVB", "EQR", "ARE", "WY", "IRM", "EXR", "MAA", "ESS", "CPT", "UDR"],
+    "Materials": ["LIN", "SHW", "FCX", "ECL", "NEM", "APD", "CTVA", "NUE", "DOW", "VMC", "MLM", "DD", "PPG", "ALB", "CE", "CF", "FMC", "EMN", "MOS", "IFF"]
+}
+
+# Flatten for API calls where needed
+BENCHMARK_TICKERS = []
+for sector, tickers in BENCHMARK_SECTORS.items():
+    BENCHMARK_TICKERS.extend(tickers)
+
+# Helper dict for fast sector lookup
+SECTOR_MAP = {}
+for sector, tickers in BENCHMARK_SECTORS.items():
+    for ticker in tickers:
+        SECTOR_MAP[ticker] = sector
+
+# Authentication Check
+if "authenticated" not in st.session_state:
+    st.session_state["authenticated"] = False
+
+if not st.session_state["authenticated"]:
+    st.markdown("""
+    <div style="text-align: center; margin-top: 50px;">
+        <h1 style="background: linear-gradient(135deg, #00C6FF, #0072FF); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Equity Analytics Login</h1>
+        <p style="color: #A0AEC0;">Please enter your authorized email to access the screener.</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        email_input = st.text_input("Email Address")
+        if st.button("Login", use_container_width=True):
+            if email_input.strip().lower() in ALLOWED_USERS:
+                st.session_state["authenticated"] = True
+                st.rerun()
+            else:
+                st.error("Unauthorized email address.")
+    st.stop()
 
 # Load positive/negative sentiment keywords from environmental variables
 pos_kw_str = os.getenv("POSITIVE_KEYWORDS", "good,positive,healthy,growth,upward,stellar,strong,bullish,profit,beats,earnings,success,upgrade,outperforms,gain,rise,expand")
@@ -464,7 +509,7 @@ for t_symbol, t_data in sentiment_map.items():
         
     # Only include positive net keyword score tickers as per screener requirement
     if t_data["keyword_score"] > 0:
-        sec = fund.get("sector", "Other")
+        sec = SECTOR_MAP.get(t_symbol, fund.get("sector", "Other"))
         if not sec or sec == "N/A":
             sec = "Other"
         screener_list.append({
