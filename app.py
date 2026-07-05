@@ -581,31 +581,8 @@ if page_choice == "📰 Positive News Screener":
                 sector_key = row['Sector'].replace(' ', '_')
                 
                 with st.container(border=True):
-                    c_header, c_action = st.columns([3, 1])
-                    with c_header:
-                        st.markdown(f"#### #{row['Rank']} [{ticker_symbol}](https://finance.yahoo.com/quote/{ticker_symbol}) - {row['Company Name']}")
-                    with c_action:
-                        if st.button("🪄 Analyze", key=f"btn_llm_{ticker_symbol}_{sector_key}", use_container_width=True):
-                            if not llm_key or llm_key.strip() == "":
-                                st.error("LLM Key is missing from the .env file.")
-                            else:
-                                ticker_articles = sentiment_map[ticker_symbol]["articles"]
-                                with st.spinner(f"🤖 Analyzing {ticker_symbol}..."):
-                                    try:
-                                        res = analyze_sentiment_with_llm(
-                                            ticker=ticker_symbol,
-                                            articles_list=ticker_articles,
-                                            provider=llm_provider,
-                                            api_key=llm_key,
-                                            model=llm_model,
-                                            endpoint=llm_endpoint if llm_endpoint.strip() else None
-                                        )
-                                        st.session_state.llm_scores[ticker_symbol] = res["score"]
-                                        st.session_state.llm_reasoning[ticker_symbol] = res["reasoning"]
-                                        st.rerun()
-                                    except Exception as e:
-                                        st.error(f"Analysis failed: {str(e)}")
-                                        
+                    st.markdown(f"#### #{row['Rank']} [{ticker_symbol}](https://finance.yahoo.com/quote/{ticker_symbol}) - {row['Company Name']}")
+                    
                     c_stat1, c_stat2, c_stat3 = st.columns(3)
                     with c_stat1:
                         st.write(f"**Keyword Score:** `{row['Keyword Score']:+d}`")
