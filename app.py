@@ -545,7 +545,7 @@ if page_choice == "📰 Positive News Screener":
                         with col_rank:
                             st.write(f"{row['Rank']}")
                         with col_tick:
-                            st.write(f"**{ticker_symbol}**")
+                            st.markdown(f"**[{ticker_symbol}](https://finance.yahoo.com/quote/{ticker_symbol})**")
                         with col_name:
                             st.write(row["Company Name"])
                         with col_score:
