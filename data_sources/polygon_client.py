@@ -10,7 +10,7 @@ def fetch_polygon_news(ticker: str, api_key: str) -> list:
     if not api_key:
         return []
         
-    url = f"https://api.polygon.io/v2/reference/news?ticker={ticker}&apiKey={api_key}"
+    url = f"https://api.polygon.io/v2/reference/news?ticker={ticker}&limit=200&apiKey={api_key}"
     
     try:
         response = requests.get(url, timeout=10)

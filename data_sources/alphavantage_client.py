@@ -14,7 +14,7 @@ def fetch_news_sentiment(api_key, ticker=None):
         )
         
     ticker_param = f"&tickers={ticker}" if ticker else ""
-    url = f"https://www.alphavantage.co/query?function=NEWS_SENTIMENT{ticker_param}&apikey={api_key}"
+    url = f"https://www.alphavantage.co/query?function=NEWS_SENTIMENT{ticker_param}&limit=200&apikey={api_key}"
     
     try:
         response = requests.get(url, timeout=10)
