@@ -298,14 +298,12 @@ page_choice = st.sidebar.radio(
     options=[
         "📰 Top Moving Ticker",
         "📈 Ticker Trend & Chart",
-        "💬 Mentioned Articles"
+        "💬 Mentioned Articles",
+        "🔌 Data Source Status"
     ],
     index=0,
     label_visibility="collapsed"
 )
-
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 🔌 Data Sources Status")
 
 def clear_cache_for(source):
     st.cache_data.clear()
@@ -319,38 +317,6 @@ def clear_cache_for(source):
             del st.session_state[k]
     st.rerun()
 
-# Yahoo status
-y_text, y_ok, y_msg = st.session_state.get("status_yahoo", ("🟢 Yahoo Finance", True, ""))
-st.sidebar.markdown(f"**{y_text}**")
-if not y_ok and y_msg:
-    st.sidebar.error(y_msg)
-if st.sidebar.button("🔄 Refresh Yahoo", key="refresh_yahoo", use_container_width=True):
-    clear_cache_for("yahoo")
-
-# Alpha Vantage status
-av_text, av_ok, av_msg = st.session_state.get("status_av", ("🟢 Alpha Vantage", True, ""))
-st.sidebar.markdown(f"**{av_text}**")
-if not av_ok and av_msg:
-    st.sidebar.error(av_msg)
-if st.sidebar.button("🔄 Refresh Alpha Vantage", key="refresh_av", use_container_width=True):
-    clear_cache_for("av")
-
-# Finnhub status
-fh_text, fh_ok, fh_msg = st.session_state.get("status_finnhub", ("🟢 Finnhub", True, ""))
-st.sidebar.markdown(f"**{fh_text}**")
-if not fh_ok and fh_msg:
-    st.sidebar.error(fh_msg)
-if st.sidebar.button("🔄 Refresh Finnhub", key="refresh_fh", use_container_width=True):
-    clear_cache_for("finnhub")
-
-# Polygon status
-pol_text, pol_ok, pol_msg = st.session_state.get("status_polygon", ("🟢 Polygon", True, ""))
-st.sidebar.markdown(f"**{pol_text}**")
-if not pol_ok and pol_msg:
-    st.sidebar.error(pol_msg)
-if st.sidebar.button("🔄 Refresh Polygon", key="refresh_pol", use_container_width=True):
-    clear_cache_for("polygon")
-
 
 # Screener parameters are removed as they are no longer needed. The scanner dynamically
 # discovers positive stocks from the general market news feed and Yahoo Finance.
@@ -358,86 +324,6 @@ if st.sidebar.button("🔄 Refresh Polygon", key="refresh_pol", use_container_wi
 # ==============================================================================
 # MAIN PANEL DASHBOARD INTERFACE
 # ==============================================================================
-
-# ------------------------------------------------------------------------------
-# TOP REFRESH CONTROLS & LAST SYNC TIMESTAMP
-# ------------------------------------------------------------------------------
-if "last_fetch_time" not in st.session_state:
-    st.session_state["last_fetch_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-col_header_left, col_header_right = st.columns([4, 1])
-with col_header_left:
-    st.write(f"⏱️ **Last Data Sync:** `{st.session_state['last_fetch_time']}`")
-with col_header_right:
-    if st.session_state.get("user_email") == "bpr.5828@gmail.com":
-        if st.button("🔄 Refresh Latest Data", key="refresh_data_btn", use_container_width=True):
-            st.cache_data.clear()
-            st.session_state["last_fetch_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            # Reset statuses and LLM cache
-            if "status_yahoo" in st.session_state:
-                del st.session_state["status_yahoo"]
-            if "status_av" in st.session_state:
-                del st.session_state["status_av"]
-            if "status_finnhub" in st.session_state:
-                del st.session_state["status_finnhub"]
-            if "status_polygon" in st.session_state:
-                del st.session_state["status_polygon"]
-            if "status_llm" in st.session_state:
-                del st.session_state["status_llm"]
-            st.session_state["llm_scores"] = {}
-            st.session_state["llm_reasoning"] = {}
-            st.rerun()
-
-# ------------------------------------------------------------------------------
-# CONNECTOR STATUS BAR
-# ------------------------------------------------------------------------------
-def render_status_panel():
-    y_text, y_ok, y_msg = st.session_state.get("status_yahoo", ("🟢 Yahoo Finance: Connected", True, ""))
-    av_text, av_ok, av_msg = st.session_state.get("status_av", ("🟢 Vintage: Connected", True, ""))
-    fh_text, fh_ok, fh_msg = st.session_state.get("status_finnhub", ("🟢 Finnhub: Connected", True, ""))
-    pol_text, pol_ok, pol_msg = st.session_state.get("status_polygon", ("🟢 Polygon: Connected", True, ""))
-    llm_text, llm_ok, llm_msg = st.session_state.get("status_llm", ("🟢 LLM: Configured", True, ""))
-    
-    def get_status_style(ok):
-        if ok:
-            return "background-color: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); color: #10B981;"
-        else:
-            return "background-color: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); color: #EF4444;"
-            
-    y_style = get_status_style(y_ok)
-    av_style = get_status_style(av_ok)
-    fh_style = get_status_style(fh_ok)
-    pol_style = get_status_style(pol_ok)
-    llm_style = get_status_style(llm_ok)
-    
-    y_tooltip = f" title=\"{y_msg}\"" if y_msg else ""
-    av_tooltip = f" title=\"{av_msg}\"" if av_msg else ""
-    fh_tooltip = f" title=\"{fh_msg}\"" if fh_msg else ""
-    pol_tooltip = f" title=\"{pol_msg}\"" if pol_msg else ""
-    llm_tooltip = f" title=\"{llm_msg}\"" if llm_msg else ""
-    
-    html = f"""
-    <div style="display:flex; gap:12px; margin: 8px 0 20px 0; flex-wrap:wrap;">
-        <div style="{y_style} padding:6px 12px; border-radius:6px; font-size:0.8rem; font-weight:600; cursor:default;"{y_tooltip}>
-            {y_text}
-        </div>
-        <div style="{av_style} padding:6px 12px; border-radius:6px; font-size:0.8rem; font-weight:600; cursor:default;"{av_tooltip}>
-            {av_text}
-        </div>
-        <div style="{fh_style} padding:6px 12px; border-radius:6px; font-size:0.8rem; font-weight:600; cursor:default;"{fh_tooltip}>
-            {fh_text}
-        </div>
-        <div style="{pol_style} padding:6px 12px; border-radius:6px; font-size:0.8rem; font-weight:600; cursor:default;"{pol_tooltip}>
-            {pol_text}
-        </div>
-        <div style="{llm_style} padding:6px 12px; border-radius:6px; font-size:0.8rem; font-weight:600; cursor:default;"{llm_tooltip}>
-            {llm_text}
-        </div>
-    </div>
-    """
-    st.markdown(html, unsafe_allow_html=True)
-
-render_status_panel()
 
 # ------------------------------------------------------------------------------
 # STEP 1: Load News Feed & Process Positive Sentiment Tickers
@@ -803,111 +689,127 @@ elif page_choice == "📈 Ticker Trend & Chart":
     if df_screener.empty:
         st.info("💡 No tickers available. Load positive tickers using the news screener first.")
     else:
-        col_chart_sel, col_chart_space = st.columns([2, 3])
-        with col_chart_sel:
-            selected_chart_ticker = st.selectbox(
-                "Select Ticker for Price Details",
-                options=df_screener["Ticker"].tolist(),
-                index=0,
-                key="chart_ticker_selector"
-            )
-            
-        # yfinance fetch fundamentals
-        fund = fetch_single_ticker_fundamentals(selected_chart_ticker)
+        tab_under_10, tab_10_50, tab_50_100, tab_over_100 = st.tabs(["< $10", "$10 - $50", "$50 - $100", "$100+"])
         
-        # Fetch historical pricing
-        with st.spinner(f"🔄 Fetching data for {selected_chart_ticker}..."):
-            ticker_data_df = fetch_historical_data([selected_chart_ticker])
-            
-        if ticker_data_df.empty:
-            st.error(f"Failed to load pricing series for {selected_chart_ticker}.")
-        else:
-            if isinstance(ticker_data_df.columns, pd.MultiIndex):
-                prices_series = ticker_data_df["Close"][selected_chart_ticker].dropna()
-                volume_series = ticker_data_df["Volume"][selected_chart_ticker].dropna()
-            else:
-                prices_series = ticker_data_df["Close"].dropna()
-                volume_series = ticker_data_df["Volume"].dropna()
-            
-            # Calculate quick metrics (using configurable 4% default risk-free rate)
-            daily_rets = prices_series.pct_change().dropna()
-            ann_ret = daily_rets.mean() * 252
-            ann_vol = daily_rets.std() * np.sqrt(252)
-            sharpe = (ann_ret - 0.04) / ann_vol if ann_vol > 0 else 0
-            
-            latest_volume = volume_series.iloc[-1] if not volume_series.empty else 0
-            
-            # Visual columns
-            col_c1, col_c2, col_c3, col_c4, col_c5 = st.columns(5)
-            with col_c1:
-                st.markdown(
-                    f"""<div class="metric-card">
-                        <p style="color:#A0AEC0; font-size:0.9rem; margin:0;">Asset</p>
-                        <h3 style="margin:5px 0 0 0; font-size:1.3rem; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{fund['name']}</h3>
-                        <p style="color:#00C6FF; font-size:0.8rem; margin:0;">{fund['sector']}</p>
-                    </div>""", 
-                    unsafe_allow_html=True
-                )
-            with col_c2:
-                pe_val = fund["pe_ratio"]
-                pe_str = f"{pe_val}" if isinstance(pe_val, (int, float)) else "N/A"
-                st.markdown(
-                    f"""<div class="metric-card">
-                        <p style="color:#A0AEC0; font-size:0.9rem; margin:0;">Market Capitalization</p>
-                        <h3 style="margin:5px 0 0 0; font-size:1.3rem; font-weight:600;">${fund['market_cap']/1e9:.2f}B</h3>
-                        <p style="color:#00C6FF; font-size:0.8rem; margin:0;">P/E: {pe_str}</p>
-                    </div>""", 
-                    unsafe_allow_html=True
-                )
-            with col_c3:
-                st.markdown(
-                    f"""<div class="metric-card">
-                        <p style="color:#A0AEC0; font-size:0.9rem; margin:0;">Volatility Metrics</p>
-                        <h3 style="margin:5px 0 0 0; font-size:1.3rem; font-weight:600; color:{'#10B981' if sharpe > 1 else '#EF4444' if sharpe < 0 else '#FFFFFF'};">{sharpe:.3f}</h3>
-                        <p style="color:#00C6FF; font-size:0.8rem; margin:0;">Sharpe Ratio (4% RF)</p>
-                    </div>""", 
-                    unsafe_allow_html=True
-                )
-            with col_c4:
-                st.markdown(
-                    f"""<div class="metric-card">
-                        <p style="color:#A0AEC0; font-size:0.9rem; margin:0;">Annualized Return / Vol</p>
-                        <h3 style="margin:5px 0 0 0; font-size:1.3rem; font-weight:600;">{ann_ret:.1%}</h3>
-                        <p style="color:#00C6FF; font-size:0.8rem; margin:0;">Vol: {ann_vol:.1%}</p>
-                    </div>""", 
-                    unsafe_allow_html=True
-                )
-            with col_c5:
-                st.markdown(
-                    f"""<div class="metric-card">
-                        <p style="color:#A0AEC0; font-size:0.9rem; margin:0;">Latest Volume</p>
-                        <h3 style="margin:5px 0 0 0; font-size:1.3rem; font-weight:600;">{latest_volume:,.0f}</h3>
-                        <p style="color:#00C6FF; font-size:0.8rem; margin:0;">As of Last Close</p>
-                    </div>""", 
-                    unsafe_allow_html=True
+        def render_chart_tab(df_cat, tab_key):
+            if df_cat.empty:
+                st.info("No tickers found in this price range.")
+                return
+                
+            col_chart_sel, col_chart_space = st.columns([2, 3])
+            with col_chart_sel:
+                selected_chart_ticker = st.selectbox(
+                    "Select Ticker for Price Details",
+                    options=df_cat["Ticker"].tolist(),
+                    index=0,
+                    key=f"chart_ticker_selector_{tab_key}"
                 )
                 
-            st.write("")
+            # yfinance fetch fundamentals
+            fund = fetch_single_ticker_fundamentals(selected_chart_ticker)
             
-            # Plotly Chart
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(
-                x=prices_series.index,
-                y=prices_series.values,
-                mode='lines',
-                name=selected_chart_ticker,
-                line=dict(color='#00C6FF', width=2.5)
-            ))
-            fig.update_layout(
-                template="plotly_dark",
-                plot_bgcolor="rgba(0,0,0,0)",
-                paper_bgcolor="rgba(0,0,0,0)",
-                margin=dict(l=10, r=10, t=10, b=10),
-                xaxis=dict(showgrid=False, color="#A0AEC0"),
-                yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)", color="#A0AEC0", side="right"),
-                height=400
-            )
-            st.plotly_chart(fig, use_container_width=True)
+            # Fetch historical pricing
+            with st.spinner(f"🔄 Fetching data for {selected_chart_ticker}..."):
+                ticker_data_df = fetch_historical_data([selected_chart_ticker])
+                
+            if ticker_data_df.empty:
+                st.error(f"Failed to load pricing series for {selected_chart_ticker}.")
+            else:
+                if isinstance(ticker_data_df.columns, pd.MultiIndex):
+                    prices_series = ticker_data_df["Close"][selected_chart_ticker].dropna()
+                    volume_series = ticker_data_df["Volume"][selected_chart_ticker].dropna()
+                else:
+                    prices_series = ticker_data_df["Close"].dropna()
+                    volume_series = ticker_data_df["Volume"].dropna()
+                
+                # Calculate quick metrics (using configurable 4% default risk-free rate)
+                daily_rets = prices_series.pct_change().dropna()
+                ann_ret = daily_rets.mean() * 252
+                ann_vol = daily_rets.std() * np.sqrt(252)
+                sharpe = (ann_ret - 0.04) / ann_vol if ann_vol > 0 else 0
+                
+                latest_volume = volume_series.iloc[-1] if not volume_series.empty else 0
+                
+                # Visual columns
+                col_c1, col_c2, col_c3, col_c4, col_c5 = st.columns(5)
+                with col_c1:
+                    st.markdown(
+                        f"""<div class="metric-card">
+                            <p style="color:#A0AEC0; font-size:0.9rem; margin:0;">Asset</p>
+                            <h3 style="margin:5px 0 0 0; font-size:1.3rem; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{fund['name']}</h3>
+                            <p style="color:#00C6FF; font-size:0.8rem; margin:0;">{fund['sector']}</p>
+                        </div>""", 
+                        unsafe_allow_html=True
+                    )
+                with col_c2:
+                    pe_val = fund["pe_ratio"]
+                    pe_str = f"{pe_val}" if isinstance(pe_val, (int, float)) else "N/A"
+                    st.markdown(
+                        f"""<div class="metric-card">
+                            <p style="color:#A0AEC0; font-size:0.9rem; margin:0;">Market Capitalization</p>
+                            <h3 style="margin:5px 0 0 0; font-size:1.3rem; font-weight:600;">${fund['market_cap']/1e9:.2f}B</h3>
+                            <p style="color:#00C6FF; font-size:0.8rem; margin:0;">P/E: {pe_str}</p>
+                        </div>""", 
+                        unsafe_allow_html=True
+                    )
+                with col_c3:
+                    st.markdown(
+                        f"""<div class="metric-card">
+                            <p style="color:#A0AEC0; font-size:0.9rem; margin:0;">Volatility Metrics</p>
+                            <h3 style="margin:5px 0 0 0; font-size:1.3rem; font-weight:600; color:{'#10B981' if sharpe > 1 else '#EF4444' if sharpe < 0 else '#FFFFFF'};">{sharpe:.3f}</h3>
+                            <p style="color:#00C6FF; font-size:0.8rem; margin:0;">Sharpe Ratio (4% RF)</p>
+                        </div>""", 
+                        unsafe_allow_html=True
+                    )
+                with col_c4:
+                    st.markdown(
+                        f"""<div class="metric-card">
+                            <p style="color:#A0AEC0; font-size:0.9rem; margin:0;">Annualized Return / Vol</p>
+                            <h3 style="margin:5px 0 0 0; font-size:1.3rem; font-weight:600;">{ann_ret:.1%}</h3>
+                            <p style="color:#00C6FF; font-size:0.8rem; margin:0;">Vol: {ann_vol:.1%}</p>
+                        </div>""", 
+                        unsafe_allow_html=True
+                    )
+                with col_c5:
+                    st.markdown(
+                        f"""<div class="metric-card">
+                            <p style="color:#A0AEC0; font-size:0.9rem; margin:0;">Latest Volume</p>
+                            <h3 style="margin:5px 0 0 0; font-size:1.3rem; font-weight:600;">{latest_volume:,.0f}</h3>
+                            <p style="color:#00C6FF; font-size:0.8rem; margin:0;">As of Last Close</p>
+                        </div>""", 
+                        unsafe_allow_html=True
+                    )
+                    
+                st.write("")
+                
+                # Plotly Chart
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(
+                    x=prices_series.index,
+                    y=prices_series.values,
+                    mode='lines',
+                    name=selected_chart_ticker,
+                    line=dict(color='#00C6FF', width=2.5)
+                ))
+                fig.update_layout(
+                    template="plotly_dark",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    margin=dict(l=10, r=10, t=10, b=10),
+                    xaxis=dict(showgrid=False, color="#A0AEC0"),
+                    yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)", color="#A0AEC0", side="right"),
+                    height=400
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
+        with tab_under_10:
+            render_chart_tab(df_screener[(df_screener["Price"] > 0) & (df_screener["Price"] < 10)], "lt10")
+        with tab_10_50:
+            render_chart_tab(df_screener[(df_screener["Price"] >= 10) & (df_screener["Price"] < 50)], "10_50")
+        with tab_50_100:
+            render_chart_tab(df_screener[(df_screener["Price"] >= 50) & (df_screener["Price"] < 100)], "50_100")
+        with tab_over_100:
+            render_chart_tab(df_screener[(df_screener["Price"] >= 100) | (df_screener["Price"] == 0)], "gt100")
 
 # ------------------------------------------------------------------------------
 # VIEW 3: MENTIONED ARTICLES
@@ -919,76 +821,128 @@ elif page_choice == "💬 Mentioned Articles":
     if df_screener.empty:
         st.info("💡 No tickers available. Load positive tickers using the news screener first.")
     else:
-        col_art_sel, col_art_space = st.columns([2, 3])
-        with col_art_sel:
-            selected_art_ticker = st.selectbox(
-                "Select Ticker to View News",
-                options=df_screener["Ticker"].tolist(),
-                index=0,
-                key="art_ticker_selector"
-            )
-            
-        ticker_news_list = sentiment_map[selected_art_ticker]["articles"]
+        tab_under_10, tab_10_50, tab_50_100, tab_over_100 = st.tabs(["< $10", "$10 - $50", "$50 - $100", "$100+"])
         
-        # Display Clickable Source Links List
-        st.markdown("#### 🔗 Article Source Links")
-        for idx, article in enumerate(ticker_news_list):
-            title_str = article.get("title", "Headline Unavailable")
-            url_str = article.get("url", "#")
-            source_str = article.get("source", "Source")
-            st.markdown(f"{idx+1}. **[{source_str}]** [{title_str}]({url_str})")
-            
-        st.markdown('<div class="glow-divider"></div>', unsafe_allow_html=True)
-        st.write(f"Showing {len(ticker_news_list)} detailed news mentions for **{selected_art_ticker}**:")
-        
-        # Display cards
-        for article in ticker_news_list:
-            title = article.get("title", "Headline Unavailable")
-            summary = article.get("summary", "Summary Unavailable")
-            source = article.get("source", "N/A")
-            score = float(article.get("overall_sentiment_score", 0.0)) if "overall_sentiment_score" in article else 0.0
-            label = article.get("overall_sentiment_label", "Neutral") if "overall_sentiment_label" in article else "N/A"
-            url = article.get("url", "#")
-            pub_time = article.get("time_published", "")
-            
-            # Format date and time
-            try:
-                dt = datetime.strptime(pub_time, "%Y%m%dT%H%M%S")
-                date_str = dt.strftime("%b %d, %Y - %I:%M %p")
-            except Exception:
-                date_str = pub_time
-            
-            # Highlight positive/negative keywords in title and summary
-            highlighted_title = highlight_keywords(title, POSITIVE_KEYWORDS, NEGATIVE_KEYWORDS)
-            highlighted_summary = highlight_keywords(summary, POSITIVE_KEYWORDS, NEGATIVE_KEYWORDS)
-            
-            # Source-specific badge tags
-            source_tag_style = "background-color:rgba(120,53,190,0.12); color:#A78BFA; border:1px solid rgba(120,53,190,0.25);" if "Yahoo" in source else "background-color:rgba(0,198,255,0.12); color:#00C6FF; border:1px solid rgba(0,198,255,0.25);"
-            
-            sentiment_class = "sentiment-neutral"
-            if label.lower() in ["bullish", "somewhat_bullish", "somewhat bullish"]:
-                sentiment_class = "sentiment-bullish"
-            elif label.lower() in ["bearish", "somewhat_bearish", "somewhat bearish"]:
-                sentiment_class = "sentiment-bearish"
+        def render_articles_tab(df_cat, tab_key):
+            if df_cat.empty:
+                st.info("No tickers found in this price range.")
+                return
                 
-            st.markdown(
-                f"""<div class="news-card">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:5px;">
-                        <div>
-                            <span style="{source_tag_style} padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:600; margin-right:8px;">🏷️ {source}</span>
-                            <span style="color:#A0AEC0; font-size:0.8rem; font-weight:500;">⏱️ {date_str}</span>
+            col_art_sel, col_art_space = st.columns([2, 3])
+            with col_art_sel:
+                selected_art_ticker = st.selectbox(
+                    "Select Ticker to View News",
+                    options=df_cat["Ticker"].tolist(),
+                    index=0,
+                    key=f"art_ticker_selector_{tab_key}"
+                )
+                
+            ticker_news_list = sentiment_map[selected_art_ticker]["articles"]
+            
+            # Display Clickable Source Links List
+            st.markdown("#### 🔗 Article Source Links")
+            for idx, article in enumerate(ticker_news_list):
+                title_str = article.get("title", "Headline Unavailable")
+                url_str = article.get("url", "#")
+                source_str = article.get("source", "Source")
+                st.markdown(f"{idx+1}. **[{source_str}]** [{title_str}]({url_str})")
+                
+            st.markdown('<div class="glow-divider"></div>', unsafe_allow_html=True)
+            st.write(f"Showing {len(ticker_news_list)} detailed news mentions for **{selected_art_ticker}**:")
+            
+            # Display cards
+            for article in ticker_news_list:
+                title = article.get("title", "Headline Unavailable")
+                summary = article.get("summary", "Summary Unavailable")
+                source = article.get("source", "N/A")
+                score = float(article.get("overall_sentiment_score", 0.0)) if "overall_sentiment_score" in article else 0.0
+                label = article.get("overall_sentiment_label", "Neutral") if "overall_sentiment_label" in article else "N/A"
+                url = article.get("url", "#")
+                pub_time = article.get("time_published", "")
+                
+                # Format date and time
+                try:
+                    dt = datetime.strptime(pub_time, "%Y%m%dT%H%M%S")
+                    date_str = dt.strftime("%b %d, %Y - %I:%M %p")
+                except Exception:
+                    date_str = pub_time
+                
+                # Highlight positive/negative keywords in title and summary
+                highlighted_title = highlight_keywords(title, POSITIVE_KEYWORDS, NEGATIVE_KEYWORDS)
+                highlighted_summary = highlight_keywords(summary, POSITIVE_KEYWORDS, NEGATIVE_KEYWORDS)
+                
+                # Source-specific badge tags
+                source_tag_style = "background-color:rgba(120,53,190,0.12); color:#A78BFA; border:1px solid rgba(120,53,190,0.25);" if "Yahoo" in source else "background-color:rgba(0,198,255,0.12); color:#00C6FF; border:1px solid rgba(0,198,255,0.25);"
+                
+                sentiment_class = "sentiment-neutral"
+                if label.lower() in ["bullish", "somewhat_bullish", "somewhat bullish"]:
+                    sentiment_class = "sentiment-bullish"
+                elif label.lower() in ["bearish", "somewhat_bearish", "somewhat bearish"]:
+                    sentiment_class = "sentiment-bearish"
+                    
+                st.markdown(
+                    f"""<div class="news-card">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:5px;">
+                            <div>
+                                <span style="{source_tag_style} padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:600; margin-right:8px;">🏷️ {source}</span>
+                                <span style="color:#A0AEC0; font-size:0.8rem; font-weight:500;">⏱️ {date_str}</span>
+                            </div>
+                            {f'<span class="sentiment-badge {sentiment_class}">{label} ({score:+.2f})</span>' if label != "N/A" else ''}
                         </div>
-                        {f'<span class="sentiment-badge {sentiment_class}">{label} ({score:+.2f})</span>' if label != "N/A" else ''}
-                    </div>
-                    <h4 style="margin:0 0 8px 0; font-size:1.05rem; font-weight:600; color:#FFFFFF;">
-                        <a href="{url}" target="_blank" style="color:#FFFFFF; text-decoration:none; hover:underline;">{highlighted_title}</a>
-                    </h4>
-                    <p style="margin:0; font-size:0.9rem; color:#D1D5DB; line-height:1.4;">{highlighted_summary}</p>
-                </div>""",
-                unsafe_allow_html=True
-            )
+                        <h4 style="margin:0 0 8px 0; font-size:1.05rem; font-weight:600; color:#FFFFFF;">
+                            <a href="{url}" target="_blank" style="color:#FFFFFF; text-decoration:none; hover:underline;">{highlighted_title}</a>
+                        </h4>
+                        <p style="margin:0; font-size:0.9rem; color:#D1D5DB; line-height:1.4;">{highlighted_summary}</p>
+                    </div>""",
+                    unsafe_allow_html=True
+                )
+
+        with tab_under_10:
+            render_articles_tab(df_screener[(df_screener["Price"] > 0) & (df_screener["Price"] < 10)], "lt10")
+        with tab_10_50:
+            render_articles_tab(df_screener[(df_screener["Price"] >= 10) & (df_screener["Price"] < 50)], "10_50")
+        with tab_50_100:
+            render_articles_tab(df_screener[(df_screener["Price"] >= 50) & (df_screener["Price"] < 100)], "50_100")
+        with tab_over_100:
+            render_articles_tab(df_screener[(df_screener["Price"] >= 100) | (df_screener["Price"] == 0)], "gt100")
 st.sidebar.markdown("""
 <div style="padding-top:20px; font-size:0.8rem; color:#718096; text-align:center;">
     Dual News Sentiments Active
 </div>
 """, unsafe_allow_html=True)
+
+# ------------------------------------------------------------------------------
+# VIEW 4: DATA SOURCE STATUS
+# ------------------------------------------------------------------------------
+if page_choice == "🔌 Data Source Status":
+    st.markdown("### 🔌 Data Source Status & Refresh")
+    st.caption("Manage data connections and refresh source caches.")
+    
+    if st.button("🔄 Refresh All Sources", use_container_width=True, type="primary"):
+        clear_cache_for("all")
+        
+    st.markdown("---")
+    
+    def render_source_row(name, source_id, status_key):
+        c1, c2, c3 = st.columns([2, 2, 1])
+        text, ok, msg = st.session_state.get(status_key, (f"🟢 {name}", True, ""))
+        
+        with c1:
+            if ok:
+                st.success(text)
+            else:
+                st.error(f"{text} - {msg}")
+                
+        with c2:
+            last_run = st.session_state.get("last_fetch_time", "Never")
+            st.write(f"**Last Run:** `{last_run}`")
+            
+        with c3:
+            if st.button(f"🔄 Refresh", key=f"refresh_{source_id}_pg", use_container_width=True):
+                clear_cache_for(source_id)
+
+    render_source_row("Yahoo Finance", "yahoo", "status_yahoo")
+    render_source_row("Alpha Vantage", "av", "status_av")
+    render_source_row("Finnhub", "finnhub", "status_finnhub")
+    render_source_row("Polygon", "polygon", "status_polygon")
+    render_source_row("LLM Provider", "llm", "status_llm")
