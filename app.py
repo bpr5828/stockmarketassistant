@@ -465,13 +465,12 @@ if news_feed_ok:
                     "url": art.get("url", "#")
                 })
 
-# Determine which tickers to fetch on Yahoo Finance:
-# - If AV loaded successfully: fetch Yahoo news only for tickers found in AV news to optimize speed.
-# - If AV key is missing or failed: scan Yahoo news for all BENCHMARK_TICKERS.
-tickers_to_fetch_yahoo = list(sentiment_map.keys()) if news_feed_ok else BENCHMARK_TICKERS
+# Determine which tickers to fetch on Yahoo Finance, Finnhub, and Polygon:
+# Always scan the full BENCHMARK_TICKERS list (220 tickers) plus any extras found in AV
+tickers_to_fetch_yahoo = list(set(list(sentiment_map.keys()) + BENCHMARK_TICKERS))
 
 if tickers_to_fetch_yahoo:
-    yahoo_spinner_msg = "Fetching Yahoo news and compiling dual-source metrics..." if news_feed_ok else "Scanning Yahoo Finance news for S&P components..."
+    yahoo_spinner_msg = f"Scanning {len(tickers_to_fetch_yahoo)} tickers across Yahoo Finance, Finnhub, & Polygon..."
     with st.spinner(f"💼 {yahoo_spinner_msg}"):
         try:
             for ticker_symbol in tickers_to_fetch_yahoo:
