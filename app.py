@@ -21,7 +21,7 @@ load_dotenv()
 # PAGE CONFIGURATION & THEME
 # ==============================================================================
 st.set_page_config(
-    page_title="Equity Analytics & Stock Screener",
+    page_title="Stock Analyst",
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -31,11 +31,19 @@ st.set_page_config(
 st.markdown("""
 <style>
     /* Hide Streamlit default top and bottom elements */
-    #MainMenu {visibility: hidden;}
-    header {visibility: hidden;}
-    footer {visibility: hidden;}
-    [data-testid="stToolbar"] {visibility: hidden;}
-    [data-testid="stDecoration"] {visibility: hidden;}
+    #MainMenu {visibility: hidden; display: none;}
+    header {visibility: hidden; display: none;}
+    footer {visibility: hidden; display: none;}
+    [data-testid="stToolbar"] {visibility: hidden; display: none;}
+    [data-testid="stDecoration"] {visibility: hidden; display: none;}
+    
+    /* Hide Streamlit Cloud "Manage App" Badge */
+    [class^="viewerBadge_"] {
+        display: none !important;
+    }
+    #st-bottom {
+        display: none !important;
+    }
 
     @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
     
@@ -202,7 +210,7 @@ if "authenticated" not in st.session_state:
 if not st.session_state["authenticated"]:
     st.markdown("""
     <div style="text-align: center; margin-top: 50px;">
-        <h1 style="background: linear-gradient(135deg, #00C6FF, #0072FF); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Equity Analytics Login</h1>
+        <h1 style="background: linear-gradient(135deg, #00C6FF, #0072FF); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Stock Analyst Login</h1>
         <p style="color: #A0AEC0;">Please enter your authorized email to access the screener.</p>
     </div>
     """, unsafe_allow_html=True)
@@ -276,7 +284,7 @@ if "llm_reasoning" not in st.session_state:
 # Sidebar Header (Title & Subtitle)
 st.sidebar.markdown("""
 <div style="margin-bottom:15px; padding-bottom:5px;">
-    <h2 style="font-weight:700; margin:0; background: linear-gradient(135deg, #00C6FF, #0072FF); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size:1.65rem; line-height:1.2;">EQUITY ANALYTICS & SCREEENER</h2>
+    <h2 style="font-weight:700; margin:0; background: linear-gradient(135deg, #00C6FF, #0072FF); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size:1.65rem; line-height:1.2;">STOCK ANALYST</h2>
     <p style="color:#A0AEC0; font-size:0.85rem; margin:5px 0 0 0; line-height:1.3;">Modular Production Stock Screener Powered by Live Yahoo Finance & Alpha Vantage</p>
 </div>
 """, unsafe_allow_html=True)
@@ -287,7 +295,7 @@ st.sidebar.markdown("---")
 page_choice = st.sidebar.radio(
     "Select Dashboard View",
     options=[
-        "📰 Positive News Screener",
+        "📰 Top Moving Ticker",
         "📈 Ticker Trend & Chart",
         "💬 Mentioned Articles"
     ],
@@ -640,8 +648,8 @@ def highlight_keywords(text, pos_kws, neg_kws):
 # ------------------------------------------------------------------------------
 # VIEW 1: NEWS SCREENER
 # ------------------------------------------------------------------------------
-if page_choice == "📰 Positive News Screener":
-    st.markdown("### 📰 Dual-Source Sentiment Stock Screener")
+if page_choice == "📰 Top Moving Ticker":
+    st.markdown("### 📰 Top Moving Ticker")
     st.caption("**Keyword Sentiment Score** = (Positive Keyword Matches) - (Negative Keyword Matches) across all aggregated articles from Yahoo Finance & Alpha Vantage news feeds.")
     
     if df_screener.empty:
