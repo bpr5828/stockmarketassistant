@@ -206,7 +206,13 @@ for sector, tickers in BENCHMARK_SECTORS.items():
 
 # Authentication Check
 if "authenticated" not in st.session_state:
-    st.session_state["authenticated"] = False
+    # Try to load from query params to persist login across reloads
+    cached_user = st.query_params.get("user")
+    if cached_user and cached_user in ALLOWED_USERS:
+        st.session_state["authenticated"] = True
+        st.session_state["user_email"] = cached_user
+    else:
+        st.session_state["authenticated"] = False
 
 if not st.session_state["authenticated"]:
     st.markdown("""
@@ -221,12 +227,23 @@ if not st.session_state["authenticated"]:
         email_input = st.text_input("Email Address")
         if st.button("Login", use_container_width=True):
             if email_input.strip().lower() in ALLOWED_USERS:
+                st.query_params["user"] = email_input.strip().lower()
                 st.session_state["authenticated"] = True
                 st.session_state["user_email"] = email_input.strip().lower()
                 st.rerun()
             else:
                 st.error("Unauthorized email address.")
     st.stop()
+
+# Show user email in top right corner
+st.markdown(
+    f"""
+    <div style="position: fixed; top: 15px; right: 20px; background: rgba(255,255,255,0.05); padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; color: #A0AEC0; z-index: 999999; border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(10px);">
+        👤 {st.session_state['user_email']}
+    </div>
+    """, 
+    unsafe_allow_html=True
+)
 
 # Load positive/negative sentiment keywords from environmental variables
 pos_kw_str = os.getenv("POSITIVE_KEYWORDS", "good,positive,healthy,growth,upward,stellar,strong,bullish,profit,beats,earnings,success,upgrade,outperforms,gain,rise,expand")
