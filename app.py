@@ -667,7 +667,7 @@ if page_choice == "📰 Top Moving Ticker":
                 selected_filter = st.selectbox("Filter by Sector:", filter_options)
             with col_filt2:
                 # Dropdown for sorting
-                sort_option = st.selectbox("Sort by:", ["Keyword Score (High to Low)", "Price (Low to High)", "Price (High to Low)"])
+                sort_option = st.selectbox("Sort by:", ["Keyword Score (High to Low)", "Price (Low to High)", "Price (High to Low)", "Price + Highest +ve Score"])
             
             # Filter screener dataframe based on selection
             if selected_filter == "All Sectors":
@@ -684,6 +684,8 @@ if page_choice == "📰 Top Moving Ticker":
                 df_sector = df_sector.sort_values(by="Price", ascending=True).reset_index(drop=True)
             elif sort_option == "Price (High to Low)":
                 df_sector = df_sector.sort_values(by="Price", ascending=False).reset_index(drop=True)
+            elif sort_option == "Price + Highest +ve Score":
+                df_sector = df_sector.sort_values(by=["Price", "Keyword Score"], ascending=[False, False]).reset_index(drop=True)
                 
             df_sector["Rank"] = df_sector.index + 1
             
