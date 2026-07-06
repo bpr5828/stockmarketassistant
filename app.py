@@ -662,8 +662,14 @@ if page_choice == "📰 Top Moving Ticker":
             col_filt1, col_filt2 = st.columns(2)
             with col_filt1:
                 # Dropdown for sector filtering
-                filter_options = ["All Sectors"] + unique_sectors
-                selected_filter = st.selectbox("Filter by Sector:", filter_options)
+                total_count = len(df_screener)
+                filter_options = [f"All Sectors ({total_count})"]
+                for sec in unique_sectors:
+                    sec_count = len(df_screener[df_screener["Sector"] == sec])
+                    filter_options.append(f"{sec} ({sec_count})")
+                    
+                selected_filter_raw = st.selectbox("Filter by Sector:", filter_options)
+                selected_filter = selected_filter_raw.rsplit(" (", 1)[0]
             with col_filt2:
                 # Dropdown for sorting
                 sort_options = [
