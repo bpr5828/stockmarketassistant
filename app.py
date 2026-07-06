@@ -532,6 +532,8 @@ if tickers_to_fetch_yahoo:
             for ticker_symbol in tickers_to_fetch_yahoo:
                 yahoo_articles = fetch_yahoo_news(ticker_symbol)
                 for y_art in yahoo_articles:
+                    if not isinstance(y_art, dict):
+                        continue
                     content_dict = y_art.get("content", {})
                     if not content_dict:
                         continue
