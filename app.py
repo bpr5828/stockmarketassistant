@@ -720,14 +720,7 @@ if page_choice == "📰 Top Moving Ticker":
             # Use a unique key based on filter and sort so page resets to 1 if user changes criteria
             page_key = f"page_{selected_filter}_{sort_option}"
             
-            st.markdown("<hr style='margin: 10px 0; border: none; border-top: 1px solid rgba(255,255,255,0.1);'/>", unsafe_allow_html=True)
-            col_page1, col_page2, col_page3 = st.columns([1, 2, 1])
-            with col_page1:
-                current_page = st.number_input("Page:", min_value=1, max_value=total_pages, step=1, key=page_key)
-            with col_page2:
-                start_display = min(total_items, 1 + (current_page - 1) * ITEMS_PER_PAGE)
-                end_display = min(total_items, current_page * ITEMS_PER_PAGE)
-                st.markdown(f"<div style='padding-top: 35px; color: #A0AEC0; font-weight: 500;'>Showing {start_display} - {end_display} of {total_items} tickers</div>", unsafe_allow_html=True)
+            current_page = st.session_state.get(page_key, 1)
             
             start_idx = (current_page - 1) * ITEMS_PER_PAGE
             end_idx = start_idx + ITEMS_PER_PAGE
@@ -776,6 +769,16 @@ if page_choice == "📰 Top Moving Ticker":
                         )
                             
                         st.markdown('<hr style="margin: 8px 0; border: none; border-top: 1px solid rgba(255,255,255,0.04);"/>', unsafe_allow_html=True)
+            
+            # Pagination UI at the bottom
+            st.markdown("<hr style='margin: 10px 0; border: none; border-top: 1px solid rgba(255,255,255,0.1);'/>", unsafe_allow_html=True)
+            col_space1, col_page1, col_page2, col_space2 = st.columns([1.5, 1, 1.5, 1])
+            with col_page1:
+                st.number_input("Page:", min_value=1, max_value=total_pages, step=1, key=page_key)
+            with col_page2:
+                start_display = min(total_items, 1 + (current_page - 1) * ITEMS_PER_PAGE)
+                end_display = min(total_items, current_page * ITEMS_PER_PAGE)
+                st.markdown(f"<div style='padding-top: 35px; color: #A0AEC0; font-weight: 500;'>Showing {start_display} - {end_display} of {total_items} tickers</div>", unsafe_allow_html=True)
 
 # ------------------------------------------------------------------------------
 # VIEW 2: TICKER TREND & CHART
