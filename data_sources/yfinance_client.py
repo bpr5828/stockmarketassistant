@@ -71,6 +71,19 @@ def fetch_historical_prices(tickers):
     return pd.DataFrame()
 
 @st.cache_data(show_spinner=False, ttl=1800)
+def fetch_historical_data(tickers):
+    """
+    Batch download 1y historical data (Close, Volume, etc) for the full ticker list
+    using yfinance. Returns a clean pandas DataFrame.
+    """
+    if not tickers:
+        return pd.DataFrame()
+    
+    # Download
+    df = yf.download(tickers, period="1y", progress=False)
+    return df
+
+@st.cache_data(show_spinner=False, ttl=1800)
 def fetch_yahoo_news(ticker):
     """
     Fetch news articles for a single ticker from Yahoo Finance.

@@ -9,7 +9,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 
 # Load modular components
-from data_sources.yfinance_client import fetch_single_ticker_fundamentals, fetch_historical_prices, fetch_yahoo_news
+from data_sources.yfinance_client import fetch_single_ticker_fundamentals, fetch_historical_prices, fetch_yahoo_news, fetch_historical_data
 from data_sources.alphavantage_client import fetch_news_sentiment
 from data_sources.finnhub_client import fetch_finnhub_news
 from data_sources.polygon_client import fetch_polygon_news
@@ -714,50 +714,30 @@ if page_choice == "📰 Top Moving Ticker":
     if df_screener.empty:
         st.info("💡 No tickers available.")
     else:
-        # Group tickers by Sector
-        unique_sectors = sorted(df_screener["Sector"].unique())
+        # Create tabs based on price
+        tab_under_10, tab_10_50, tab_50_100, tab_over_100 = st.tabs(["< $10", "$10 - $50", "$50 - $100", "$100+"])
         
-        if unique_sectors:
-            # Removed the sorting dropdown as per user request to just show lowest to highest price.
-            total_count = len(df_screener)
-            filter_options = [f"All Sectors ({total_count})"]
-            for sec in unique_sectors:
-                sec_count = len(df_screener[df_screener["Sector"] == sec])
-                filter_options.append(f"{sec} ({sec_count})")
+        def render_category(df_cat, cat_name):
+            if df_cat.empty:
+                st.info(f"No tickers found in {cat_name}.")
+                return
                 
-            selected_filter_raw = st.selectbox("Filter by Sector:", filter_options)
-            selected_filter = selected_filter_raw.rsplit(" (", 1)[0]
+            df_cat = df_cat.reset_index(drop=True)
+            df_cat["Rank"] = df_cat.index + 1
             
-            # Filter screener dataframe based on selection
-            if selected_filter == "All Sectors":
-                df_sector = df_screener.copy().reset_index(drop=True)
-                st.write("Showing tickers across **All Sectors**:")
-            else:
-                df_sector = df_screener[df_screener["Sector"] == selected_filter].reset_index(drop=True)
-                st.write(f"Showing tickers in the **{selected_filter}** sector:")
-                
-            # It's already sorted by price lowest to highest from earlier
-            df_sector["Rank"] = df_sector.index + 1
-            
-            # Pagination Logic
-            ITEMS_PER_PAGE = 15
-            total_items = len(df_sector)
+            ITEMS_PER_PAGE = 50
+            total_items = len(df_cat)
             total_pages = max(1, math.ceil(total_items / ITEMS_PER_PAGE))
             
-            # Use a unique key based on filter so page resets to 1 if user changes criteria
-            page_key = f"page_{selected_filter}"
-            
+            page_key = f"page_price_{cat_name.replace(' ', '_').replace('<', 'lt').replace('$', 'usd').replace('+', 'plus')}"
             current_page = st.session_state.get(page_key, 1)
             
             start_idx = (current_page - 1) * ITEMS_PER_PAGE
             end_idx = start_idx + ITEMS_PER_PAGE
-            df_page = df_sector.iloc[start_idx:end_idx]
+            df_page = df_cat.iloc[start_idx:end_idx]
             
-            # Responsive Card Layout for Screener Rows
             for idx, row in df_page.iterrows():
                 ticker_symbol = row["Ticker"]
-                # Create a unique key for the button to avoid duplication errors across filters
-                sector_key = row['Sector'].replace(' ', '_')
                 
                 with st.container(border=True):
                     price_str = f"${row['Price']:.2f}" if isinstance(row['Price'], (int, float)) and row['Price'] > 0 else "Price N/A"
@@ -776,7 +756,6 @@ if page_choice == "📰 Top Moving Ticker":
                     with c_stat3:
                         st.caption(f"**Keywords:** {row['Matched Keywords']}")
                         
-                    # Render LLM Reasoning card if analyzed
                     if ticker_symbol in st.session_state.llm_scores:
                         score_val = st.session_state.llm_scores[ticker_symbol]
                         reasoning_val = st.session_state.llm_reasoning[ticker_symbol]
@@ -794,10 +773,8 @@ if page_choice == "📰 Top Moving Ticker":
                             </div>""",
                             unsafe_allow_html=True
                         )
-                            
                         st.markdown('<hr style="margin: 8px 0; border: none; border-top: 1px solid rgba(255,255,255,0.04);"/>', unsafe_allow_html=True)
             
-            # Pagination UI at the bottom
             st.markdown("<hr style='margin: 10px 0; border: none; border-top: 1px solid rgba(255,255,255,0.1);'/>", unsafe_allow_html=True)
             col_space1, col_page1, col_page2, col_space2 = st.columns([1.5, 1, 1.5, 1])
             with col_page1:
@@ -806,6 +783,15 @@ if page_choice == "📰 Top Moving Ticker":
                 start_display = min(total_items, 1 + (current_page - 1) * ITEMS_PER_PAGE)
                 end_display = min(total_items, current_page * ITEMS_PER_PAGE)
                 st.markdown(f"<div style='padding-top: 35px; color: #A0AEC0; font-weight: 500;'>Showing {start_display} - {end_display} of {total_items} tickers</div>", unsafe_allow_html=True)
+        
+        with tab_under_10:
+            render_category(df_screener[(df_screener["Price"] > 0) & (df_screener["Price"] < 10)], "< $10")
+        with tab_10_50:
+            render_category(df_screener[(df_screener["Price"] >= 10) & (df_screener["Price"] < 50)], "$10 - $50")
+        with tab_50_100:
+            render_category(df_screener[(df_screener["Price"] >= 50) & (df_screener["Price"] < 100)], "$50 - $100")
+        with tab_over_100:
+            render_category(df_screener[(df_screener["Price"] >= 100) | (df_screener["Price"] == 0)], "$100+")
 
 # ------------------------------------------------------------------------------
 # VIEW 2: TICKER TREND & CHART
@@ -830,13 +816,18 @@ elif page_choice == "📈 Ticker Trend & Chart":
         fund = fetch_single_ticker_fundamentals(selected_chart_ticker)
         
         # Fetch historical pricing
-        with st.spinner(f"🔄 Fetching prices for {selected_chart_ticker}..."):
-            ticker_price_df = fetch_historical_prices([selected_chart_ticker])
+        with st.spinner(f"🔄 Fetching data for {selected_chart_ticker}..."):
+            ticker_data_df = fetch_historical_data([selected_chart_ticker])
             
-        if ticker_price_df.empty:
+        if ticker_data_df.empty:
             st.error(f"Failed to load pricing series for {selected_chart_ticker}.")
         else:
-            prices_series = ticker_price_df[selected_chart_ticker].dropna()
+            if isinstance(ticker_data_df.columns, pd.MultiIndex):
+                prices_series = ticker_data_df["Close"][selected_chart_ticker].dropna()
+                volume_series = ticker_data_df["Volume"][selected_chart_ticker].dropna()
+            else:
+                prices_series = ticker_data_df["Close"].dropna()
+                volume_series = ticker_data_df["Volume"].dropna()
             
             # Calculate quick metrics (using configurable 4% default risk-free rate)
             daily_rets = prices_series.pct_change().dropna()
@@ -844,8 +835,10 @@ elif page_choice == "📈 Ticker Trend & Chart":
             ann_vol = daily_rets.std() * np.sqrt(252)
             sharpe = (ann_ret - 0.04) / ann_vol if ann_vol > 0 else 0
             
+            latest_volume = volume_series.iloc[-1] if not volume_series.empty else 0
+            
             # Visual columns
-            col_c1, col_c2, col_c3, col_c4 = st.columns(4)
+            col_c1, col_c2, col_c3, col_c4, col_c5 = st.columns(5)
             with col_c1:
                 st.markdown(
                     f"""<div class="metric-card">
@@ -881,6 +874,15 @@ elif page_choice == "📈 Ticker Trend & Chart":
                         <p style="color:#A0AEC0; font-size:0.9rem; margin:0;">Annualized Return / Vol</p>
                         <h3 style="margin:5px 0 0 0; font-size:1.3rem; font-weight:600;">{ann_ret:.1%}</h3>
                         <p style="color:#00C6FF; font-size:0.8rem; margin:0;">Vol: {ann_vol:.1%}</p>
+                    </div>""", 
+                    unsafe_allow_html=True
+                )
+            with col_c5:
+                st.markdown(
+                    f"""<div class="metric-card">
+                        <p style="color:#A0AEC0; font-size:0.9rem; margin:0;">Latest Volume</p>
+                        <h3 style="margin:5px 0 0 0; font-size:1.3rem; font-weight:600;">{latest_volume:,.0f}</h3>
+                        <p style="color:#00C6FF; font-size:0.8rem; margin:0;">As of Last Close</p>
                     </div>""", 
                     unsafe_allow_html=True
                 )
