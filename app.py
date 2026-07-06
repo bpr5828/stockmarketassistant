@@ -425,10 +425,16 @@ if tickers_to_fetch_yahoo:
                         continue
                         
                     y_title = content_dict.get("title") or ""
-                    y_publisher = content_dict.get("provider", {}).get("displayName") or "Yahoo Finance"
-                    y_link = content_dict.get("clickThroughUrl", {}).get("url") or "#"
+                    
+                    provider_dict = content_dict.get("provider") or {}
+                    y_publisher = provider_dict.get("displayName") or "Yahoo Finance"
+                    
+                    click_through = content_dict.get("clickThroughUrl") or {}
+                    y_link = click_through.get("url") or "#"
                     if y_link == "#":
-                        y_link = content_dict.get("canonicalUrl", {}).get("url") or "#"
+                        canonical = content_dict.get("canonicalUrl") or {}
+                        y_link = canonical.get("url") or "#"
+                        
                     y_time_raw = content_dict.get("pubDate") or ""
                     y_summary = content_dict.get("summary") or "Full story available at source link."
                     
@@ -474,6 +480,8 @@ if tickers_to_fetch_yahoo:
                 if finnhub_key and finnhub_key.strip() != "":
                     fh_articles = fetch_finnhub_news(ticker_symbol, finnhub_key)
                     for fh_art in fh_articles:
+                        if not isinstance(fh_art, dict):
+                            continue
                         fh_title = fh_art.get("title") or ""
                         fh_summary = fh_art.get("summary") or ""
                         fh_text = (fh_title + " " + fh_summary).lower()
@@ -499,6 +507,8 @@ if tickers_to_fetch_yahoo:
                 if polygon_key and polygon_key.strip() != "":
                     pol_articles = fetch_polygon_news(ticker_symbol, polygon_key)
                     for pol_art in pol_articles:
+                        if not isinstance(pol_art, dict):
+                            continue
                         pol_title = pol_art.get("title") or ""
                         pol_summary = pol_art.get("summary") or ""
                         pol_text = (pol_title + " " + pol_summary).lower()
