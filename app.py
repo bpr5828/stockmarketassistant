@@ -4,6 +4,7 @@ import numpy as np
 import plotly.graph_objects as go
 import os
 import re
+import math
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -711,8 +712,29 @@ if page_choice == "📰 Top Moving Ticker":
                 
             df_sector["Rank"] = df_sector.index + 1
             
+            # Pagination Logic
+            ITEMS_PER_PAGE = 15
+            total_items = len(df_sector)
+            total_pages = max(1, math.ceil(total_items / ITEMS_PER_PAGE))
+            
+            # Use a unique key based on filter and sort so page resets to 1 if user changes criteria
+            page_key = f"page_{selected_filter}_{sort_option}"
+            
+            st.markdown("<hr style='margin: 10px 0; border: none; border-top: 1px solid rgba(255,255,255,0.1);'/>", unsafe_allow_html=True)
+            col_page1, col_page2, col_page3 = st.columns([1, 2, 1])
+            with col_page1:
+                current_page = st.number_input("Page:", min_value=1, max_value=total_pages, step=1, key=page_key)
+            with col_page2:
+                start_display = min(total_items, 1 + (current_page - 1) * ITEMS_PER_PAGE)
+                end_display = min(total_items, current_page * ITEMS_PER_PAGE)
+                st.markdown(f"<div style='padding-top: 35px; color: #A0AEC0; font-weight: 500;'>Showing {start_display} - {end_display} of {total_items} tickers</div>", unsafe_allow_html=True)
+            
+            start_idx = (current_page - 1) * ITEMS_PER_PAGE
+            end_idx = start_idx + ITEMS_PER_PAGE
+            df_page = df_sector.iloc[start_idx:end_idx]
+            
             # Responsive Card Layout for Screener Rows
-            for idx, row in df_sector.iterrows():
+            for idx, row in df_page.iterrows():
                 ticker_symbol = row["Ticker"]
                 # Create a unique key for the button to avoid duplication errors across filters
                 sector_key = row['Sector'].replace(' ', '_')
