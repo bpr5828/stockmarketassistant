@@ -469,6 +469,13 @@ if news_feed_ok:
 # Always scan the full BENCHMARK_TICKERS list (220 tickers) plus any extras found in AV
 tickers_to_fetch_yahoo = list(set(list(sentiment_map.keys()) + BENCHMARK_TICKERS))
 
+# Pre-initialize sentiment map for all tickers so they appear in the UI even with 0 mentions
+for t in tickers_to_fetch_yahoo:
+    if t not in sentiment_map:
+        sentiment_map[t] = {
+            "mention_count": 0, "keyword_score": 0, "articles": [], "pos_words": set(), "neg_words": set()
+        }
+
 if tickers_to_fetch_yahoo:
     yahoo_spinner_msg = f"Scanning {len(tickers_to_fetch_yahoo)} tickers across Yahoo Finance, Finnhub, & Polygon..."
     with st.spinner(f"💼 {yahoo_spinner_msg}"):
@@ -605,22 +612,20 @@ for t_symbol, t_data in sentiment_map.items():
     else:
         kw_display = "None"
         
-    # Only include positive net keyword score tickers as per screener requirement
-    if t_data["keyword_score"] > 0:
-        sec = SECTOR_MAP.get(t_symbol, fund.get("sector", "Other"))
-        if not sec or sec == "N/A":
-            sec = "Other"
-        screener_list.append({
-            "Ticker": t_symbol,
-            "Company Name": fund["name"],
-            "Sector": sec,
-            "Mentions": t_data["mention_count"],
-            "Keyword Score": t_data["keyword_score"],
-            "Price": fund.get("price", 0.0),
-            "LLM Score": llm_score_str,
-            "raw_llm_score": llm_score,
-            "Matched Keywords": kw_display
-        })
+    sec = SECTOR_MAP.get(t_symbol, fund.get("sector", "Other"))
+    if not sec or sec == "N/A":
+        sec = "Other"
+    screener_list.append({
+        "Ticker": t_symbol,
+        "Company Name": fund["name"],
+        "Sector": sec,
+        "Mentions": t_data["mention_count"],
+        "Keyword Score": t_data["keyword_score"],
+        "Price": fund.get("price", 0.0),
+        "LLM Score": llm_score_str,
+        "raw_llm_score": llm_score,
+        "Matched Keywords": kw_display
+    })
 
 df_screener = pd.DataFrame(screener_list)
 if not df_screener.empty:
