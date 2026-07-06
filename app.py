@@ -304,6 +304,54 @@ page_choice = st.sidebar.radio(
     label_visibility="collapsed"
 )
 
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 🔌 Data Sources Status")
+
+def clear_cache_for(source):
+    st.cache_data.clear()
+    st.session_state["last_fetch_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    if source == "all":
+        keys_to_delete = ["status_yahoo", "status_av", "status_finnhub", "status_polygon", "status_llm"]
+    else:
+        keys_to_delete = [f"status_{source}"]
+    for k in keys_to_delete:
+        if k in st.session_state:
+            del st.session_state[k]
+    st.rerun()
+
+# Yahoo status
+y_text, y_ok, y_msg = st.session_state.get("status_yahoo", ("🟢 Yahoo Finance", True, ""))
+st.sidebar.markdown(f"**{y_text}**")
+if not y_ok and y_msg:
+    st.sidebar.error(y_msg)
+if st.sidebar.button("🔄 Refresh Yahoo", key="refresh_yahoo", use_container_width=True):
+    clear_cache_for("yahoo")
+
+# Alpha Vantage status
+av_text, av_ok, av_msg = st.session_state.get("status_av", ("🟢 Alpha Vantage", True, ""))
+st.sidebar.markdown(f"**{av_text}**")
+if not av_ok and av_msg:
+    st.sidebar.error(av_msg)
+if st.sidebar.button("🔄 Refresh Alpha Vantage", key="refresh_av", use_container_width=True):
+    clear_cache_for("av")
+
+# Finnhub status
+fh_text, fh_ok, fh_msg = st.session_state.get("status_finnhub", ("🟢 Finnhub", True, ""))
+st.sidebar.markdown(f"**{fh_text}**")
+if not fh_ok and fh_msg:
+    st.sidebar.error(fh_msg)
+if st.sidebar.button("🔄 Refresh Finnhub", key="refresh_fh", use_container_width=True):
+    clear_cache_for("finnhub")
+
+# Polygon status
+pol_text, pol_ok, pol_msg = st.session_state.get("status_polygon", ("🟢 Polygon", True, ""))
+st.sidebar.markdown(f"**{pol_text}**")
+if not pol_ok and pol_msg:
+    st.sidebar.error(pol_msg)
+if st.sidebar.button("🔄 Refresh Polygon", key="refresh_pol", use_container_width=True):
+    clear_cache_for("polygon")
+
+
 # Screener parameters are removed as they are no longer needed. The scanner dynamically
 # discovers positive stocks from the general market news feed and Yahoo Finance.
 
@@ -630,8 +678,11 @@ for t_symbol, t_data in sentiment_map.items():
 
 df_screener = pd.DataFrame(screener_list)
 if not df_screener.empty:
-    # Sort by Keyword Score descending
-    df_screener = df_screener.sort_values(by="Keyword Score", ascending=False).reset_index(drop=True)
+    # Handle missing prices for sorting, set to infinity so they drop to bottom if ascending, but here we want lowest to highest
+    df_screener["SortPrice"] = df_screener["Price"].apply(lambda x: float(x) if isinstance(x, (int, float)) and float(x) > 0 else float('inf'))
+    # Sort by Price Lowest to Highest
+    df_screener = df_screener.sort_values(by="SortPrice", ascending=True).reset_index(drop=True)
+    df_screener = df_screener.drop(columns=["SortPrice"])
     df_screener["Rank"] = df_screener.index + 1
 else:
     df_screener = pd.DataFrame(columns=["Rank", "Ticker", "Company Name", "Mentions", "Keyword Score", "Price", "LLM Score", "Matched Keywords"])
@@ -659,57 +710,31 @@ if page_choice == "📰 Top Moving Ticker":
     st.caption("**Keyword Sentiment Score** = (Positive Keyword Matches) - (Negative Keyword Matches) across all aggregated articles from Yahoo Finance & Alpha Vantage news feeds.")
     
     if df_screener.empty:
-        st.info("💡 No stocks with positive net keyword mentions found in recent news feeds.")
+        st.info("💡 No tickers available.")
     else:
-        # Group positive stocks by Sector
+        # Group tickers by Sector
         unique_sectors = sorted(df_screener["Sector"].unique())
         
         if unique_sectors:
-            col_filt1, col_filt2 = st.columns(2)
-            with col_filt1:
-                # Dropdown for sector filtering
-                total_count = len(df_screener)
-                filter_options = [f"All Sectors ({total_count})"]
-                for sec in unique_sectors:
-                    sec_count = len(df_screener[df_screener["Sector"] == sec])
-                    filter_options.append(f"{sec} ({sec_count})")
-                    
-                selected_filter_raw = st.selectbox("Filter by Sector:", filter_options)
-                selected_filter = selected_filter_raw.rsplit(" (", 1)[0]
-            with col_filt2:
-                # Dropdown for sorting
-                sort_options = [
-                    "Keyword Score (High to Low)",
-                    "Keyword Score (Low to High)",
-                    "Price (High to Low) + Score (High to Low)",
-                    "Price (High to Low) + Score (Low to High)",
-                    "Price (Low to High) + Score (High to Low)",
-                    "Price (Low to High) + Score (Low to High)"
-                ]
-                sort_option = st.selectbox("Sort by:", sort_options)
+            # Removed the sorting dropdown as per user request to just show lowest to highest price.
+            total_count = len(df_screener)
+            filter_options = [f"All Sectors ({total_count})"]
+            for sec in unique_sectors:
+                sec_count = len(df_screener[df_screener["Sector"] == sec])
+                filter_options.append(f"{sec} ({sec_count})")
+                
+            selected_filter_raw = st.selectbox("Filter by Sector:", filter_options)
+            selected_filter = selected_filter_raw.rsplit(" (", 1)[0]
             
             # Filter screener dataframe based on selection
             if selected_filter == "All Sectors":
                 df_sector = df_screener.copy().reset_index(drop=True)
-                st.write("Showing positive sentiment stocks across **All Sectors**:")
+                st.write("Showing tickers across **All Sectors**:")
             else:
                 df_sector = df_screener[df_screener["Sector"] == selected_filter].reset_index(drop=True)
-                st.write(f"Showing positive sentiment stocks in the **{selected_filter}** sector:")
+                st.write(f"Showing tickers in the **{selected_filter}** sector:")
                 
-            # Apply sorting
-            if sort_option == "Keyword Score (High to Low)":
-                df_sector = df_sector.sort_values(by=["Keyword Score", "Price"], ascending=[False, False]).reset_index(drop=True)
-            elif sort_option == "Keyword Score (Low to High)":
-                df_sector = df_sector.sort_values(by=["Keyword Score", "Price"], ascending=[True, True]).reset_index(drop=True)
-            elif sort_option == "Price (High to Low) + Score (High to Low)":
-                df_sector = df_sector.sort_values(by=["Price", "Keyword Score"], ascending=[False, False]).reset_index(drop=True)
-            elif sort_option == "Price (High to Low) + Score (Low to High)":
-                df_sector = df_sector.sort_values(by=["Price", "Keyword Score"], ascending=[False, True]).reset_index(drop=True)
-            elif sort_option == "Price (Low to High) + Score (High to Low)":
-                df_sector = df_sector.sort_values(by=["Price", "Keyword Score"], ascending=[True, False]).reset_index(drop=True)
-            elif sort_option == "Price (Low to High) + Score (Low to High)":
-                df_sector = df_sector.sort_values(by=["Price", "Keyword Score"], ascending=[True, True]).reset_index(drop=True)
-                
+            # It's already sorted by price lowest to highest from earlier
             df_sector["Rank"] = df_sector.index + 1
             
             # Pagination Logic
@@ -717,8 +742,8 @@ if page_choice == "📰 Top Moving Ticker":
             total_items = len(df_sector)
             total_pages = max(1, math.ceil(total_items / ITEMS_PER_PAGE))
             
-            # Use a unique key based on filter and sort so page resets to 1 if user changes criteria
-            page_key = f"page_{selected_filter}_{sort_option}"
+            # Use a unique key based on filter so page resets to 1 if user changes criteria
+            page_key = f"page_{selected_filter}"
             
             current_page = st.session_state.get(page_key, 1)
             
