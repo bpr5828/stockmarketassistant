@@ -285,7 +285,7 @@ if "llm_reasoning" not in st.session_state:
 st.sidebar.markdown("""
 <div style="margin-bottom:15px; padding-bottom:5px;">
     <h2 style="font-weight:700; margin:0; background: linear-gradient(135deg, #00C6FF, #0072FF); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size:1.65rem; line-height:1.2;">STOCK ANALYST</h2>
-    <p style="color:#A0AEC0; font-size:0.85rem; margin:5px 0 0 0; line-height:1.3;">Modular Production Stock Screener Powered by Live Yahoo Finance & Alpha Vantage</p>
+    <p style="color:#A0AEC0; font-size:0.85rem; margin:5px 0 0 0; line-height:1.3;">Top Moving Ticker Powered by Live Yahoo Finance, Alpha Vantage, Finnhub & Polygon.io</p>
 </div>
 """, unsafe_allow_html=True)
 
