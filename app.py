@@ -481,13 +481,13 @@ if tickers_to_fetch_yahoo:
                     if not content_dict:
                         continue
                         
-                    y_title = content_dict.get("title", "")
-                    y_publisher = content_dict.get("provider", {}).get("displayName", "Yahoo Finance")
-                    y_link = content_dict.get("clickThroughUrl", {}).get("url", "#")
+                    y_title = content_dict.get("title") or ""
+                    y_publisher = content_dict.get("provider", {}).get("displayName") or "Yahoo Finance"
+                    y_link = content_dict.get("clickThroughUrl", {}).get("url") or "#"
                     if y_link == "#":
-                        y_link = content_dict.get("canonicalUrl", {}).get("url", "#")
-                    y_time_raw = content_dict.get("pubDate", "")
-                    y_summary = content_dict.get("summary", "Full story available at source link.")
+                        y_link = content_dict.get("canonicalUrl", {}).get("url") or "#"
+                    y_time_raw = content_dict.get("pubDate") or ""
+                    y_summary = content_dict.get("summary") or "Full story available at source link."
                     
                     y_time = ""
                     if y_time_raw:
@@ -531,8 +531,8 @@ if tickers_to_fetch_yahoo:
                 if finnhub_key and finnhub_key.strip() != "":
                     fh_articles = fetch_finnhub_news(ticker_symbol, finnhub_key)
                     for fh_art in fh_articles:
-                        fh_title = fh_art.get("title", "")
-                        fh_summary = fh_art.get("summary", "")
+                        fh_title = fh_art.get("title") or ""
+                        fh_summary = fh_art.get("summary") or ""
                         fh_text = (fh_title + " " + fh_summary).lower()
                         fh_pos_hits = sum(len(re.findall(r'\b' + re.escape(word) + r'\b', fh_text)) for word in POSITIVE_KEYWORDS)
                         fh_neg_hits = sum(len(re.findall(r'\b' + re.escape(word) + r'\b', fh_text)) for word in NEGATIVE_KEYWORDS)
@@ -556,8 +556,8 @@ if tickers_to_fetch_yahoo:
                 if polygon_key and polygon_key.strip() != "":
                     pol_articles = fetch_polygon_news(ticker_symbol, polygon_key)
                     for pol_art in pol_articles:
-                        pol_title = pol_art.get("title", "")
-                        pol_summary = pol_art.get("summary", "")
+                        pol_title = pol_art.get("title") or ""
+                        pol_summary = pol_art.get("summary") or ""
                         pol_text = (pol_title + " " + pol_summary).lower()
                         pol_pos_hits = sum(len(re.findall(r'\b' + re.escape(word) + r'\b', pol_text)) for word in POSITIVE_KEYWORDS)
                         pol_neg_hits = sum(len(re.findall(r'\b' + re.escape(word) + r'\b', pol_text)) for word in NEGATIVE_KEYWORDS)
