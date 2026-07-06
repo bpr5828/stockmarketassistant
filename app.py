@@ -617,6 +617,7 @@ for t_symbol, t_data in sentiment_map.items():
             "Sector": sec,
             "Mentions": t_data["mention_count"],
             "Keyword Score": t_data["keyword_score"],
+            "Price": fund.get("price", 0.0),
             "LLM Score": llm_score_str,
             "raw_llm_score": llm_score,
             "Matched Keywords": kw_display
@@ -628,7 +629,7 @@ if not df_screener.empty:
     df_screener = df_screener.sort_values(by="Keyword Score", ascending=False).reset_index(drop=True)
     df_screener["Rank"] = df_screener.index + 1
 else:
-    df_screener = pd.DataFrame(columns=["Rank", "Ticker", "Company Name", "Mentions", "Keyword Score", "LLM Score", "Matched Keywords"])
+    df_screener = pd.DataFrame(columns=["Rank", "Ticker", "Company Name", "Mentions", "Keyword Score", "Price", "LLM Score", "Matched Keywords"])
 
 # Helper to highlight matching keywords in text (case-insensitive)
 def highlight_keywords(text, pos_kws, neg_kws):
@@ -659,9 +660,14 @@ if page_choice == "📰 Top Moving Ticker":
         unique_sectors = sorted(df_screener["Sector"].unique())
         
         if unique_sectors:
-            # Dropdown for sector filtering
-            filter_options = ["All Sectors"] + unique_sectors
-            selected_filter = st.selectbox("Filter by Sector:", filter_options)
+            col_filt1, col_filt2 = st.columns(2)
+            with col_filt1:
+                # Dropdown for sector filtering
+                filter_options = ["All Sectors"] + unique_sectors
+                selected_filter = st.selectbox("Filter by Sector:", filter_options)
+            with col_filt2:
+                # Dropdown for sorting
+                sort_option = st.selectbox("Sort by:", ["Keyword Score (High to Low)", "Price (Low to High)", "Price (High to Low)"])
             
             # Filter screener dataframe based on selection
             if selected_filter == "All Sectors":
@@ -670,6 +676,14 @@ if page_choice == "📰 Top Moving Ticker":
             else:
                 df_sector = df_screener[df_screener["Sector"] == selected_filter].reset_index(drop=True)
                 st.write(f"Showing positive sentiment stocks in the **{selected_filter}** sector:")
+                
+            # Apply sorting
+            if sort_option == "Keyword Score (High to Low)":
+                df_sector = df_sector.sort_values(by="Keyword Score", ascending=False).reset_index(drop=True)
+            elif sort_option == "Price (Low to High)":
+                df_sector = df_sector.sort_values(by="Price", ascending=True).reset_index(drop=True)
+            elif sort_option == "Price (High to Low)":
+                df_sector = df_sector.sort_values(by="Price", ascending=False).reset_index(drop=True)
                 
             df_sector["Rank"] = df_sector.index + 1
             
@@ -680,7 +694,8 @@ if page_choice == "📰 Top Moving Ticker":
                 sector_key = row['Sector'].replace(' ', '_')
                 
                 with st.container(border=True):
-                    st.markdown(f"#### #{row['Rank']} [{ticker_symbol}](https://finance.yahoo.com/quote/{ticker_symbol}) - {row['Company Name']}")
+                    price_str = f"${row['Price']:.2f}" if isinstance(row['Price'], (int, float)) and row['Price'] > 0 else "Price N/A"
+                    st.markdown(f"#### #{row['Rank']} [{ticker_symbol}](https://finance.yahoo.com/quote/{ticker_symbol}) - {row['Company Name']} ({price_str})")
                     
                     c_stat1, c_stat2, c_stat3 = st.columns(3)
                     with c_stat1:

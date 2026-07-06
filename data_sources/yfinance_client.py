@@ -12,11 +12,12 @@ def fetch_single_ticker_fundamentals(ticker):
         t = yf.Ticker(ticker)
         info = t.info
         
-        # Extract name, sector, industry, market cap, and PE ratio
+        # Extract name, sector, industry, market cap, PE ratio, and price
         name = info.get("longName") or info.get("shortName") or ticker
         sector = info.get("sector") or "N/A"
         industry = info.get("industry") or "N/A"
         mcap = info.get("marketCap") or 0
+        price = info.get("currentPrice") or info.get("regularMarketPrice") or info.get("previousClose") or 0.0
         
         pe = info.get("forwardPE") or info.get("trailingPE")
         if pe is not None:
@@ -29,7 +30,8 @@ def fetch_single_ticker_fundamentals(ticker):
             "sector": sector,
             "industry": industry,
             "market_cap": mcap,
-            "pe_ratio": pe
+            "pe_ratio": pe,
+            "price": price
         }
     except Exception as e:
         # Propagation of error or empty dict depending on requirements.
@@ -41,6 +43,7 @@ def fetch_single_ticker_fundamentals(ticker):
             "industry": "N/A",
             "market_cap": 0,
             "pe_ratio": "N/A",
+            "price": 0.0,
             "error": str(e)
         }
 
