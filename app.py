@@ -10,6 +10,8 @@ from dotenv import load_dotenv
 # Load modular components
 from data_sources.yfinance_client import fetch_single_ticker_fundamentals, fetch_historical_prices, fetch_yahoo_news
 from data_sources.alphavantage_client import fetch_news_sentiment
+from data_sources.finnhub_client import fetch_finnhub_news
+from data_sources.polygon_client import fetch_polygon_news
 from llm.llm_client import generate_llm_reasoning, analyze_sentiment_with_llm
 
 # Load environment variables from .env
@@ -28,6 +30,13 @@ st.set_page_config(
 # Custom CSS for Premium Look and Feel
 st.markdown("""
 <style>
+    /* Hide Streamlit default top and bottom elements */
+    #MainMenu {visibility: hidden;}
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
+    [data-testid="stToolbar"] {visibility: hidden;}
+    [data-testid="stDecoration"] {visibility: hidden;}
+
     @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
     
     /* Font styles */
@@ -204,6 +213,7 @@ if not st.session_state["authenticated"]:
         if st.button("Login", use_container_width=True):
             if email_input.strip().lower() in ALLOWED_USERS:
                 st.session_state["authenticated"] = True
+                st.session_state["user_email"] = email_input.strip().lower()
                 st.rerun()
             else:
                 st.error("Unauthorized email address.")
@@ -218,6 +228,8 @@ NEGATIVE_KEYWORDS = [w.strip().lower() for w in neg_kw_str.split(",") if w.strip
 
 # Load credentials strictly from .env
 av_key = os.getenv("ALPHA_VANTAGE_API_KEY", "")
+finnhub_key = os.getenv("FINNHUB_API_KEY", "")
+polygon_key = os.getenv("POLYGON_API_KEY", "")
 llm_provider = os.getenv("LLM_PROVIDER", "gemini").lower()
 llm_key = os.getenv("LLM_API_KEY", "")
 llm_model = os.getenv("LLM_MODEL", "gemini-1.5-flash")
@@ -232,6 +244,18 @@ if "status_av" not in st.session_state:
         st.session_state["status_av"] = ("🔴 Vintage: Key Missing", False, "Alpha Vantage API Key is missing from the .env file.")
     else:
         st.session_state["status_av"] = ("🟢 Vintage: Connected", True, "Alpha Vantage key configured successfully.")
+
+if "status_finnhub" not in st.session_state:
+    if not finnhub_key or finnhub_key.strip() == "":
+        st.session_state["status_finnhub"] = ("🔴 Finnhub: Key Missing", False, "Finnhub API Key is missing from the .env file.")
+    else:
+        st.session_state["status_finnhub"] = ("🟢 Finnhub: Connected", True, "Finnhub key configured successfully.")
+
+if "status_polygon" not in st.session_state:
+    if not polygon_key or polygon_key.strip() == "":
+        st.session_state["status_polygon"] = ("🔴 Polygon: Key Missing", False, "Polygon.io API Key is missing from the .env file.")
+    else:
+        st.session_state["status_polygon"] = ("🟢 Polygon: Connected", True, "Polygon key configured successfully.")
 
 if "status_llm" not in st.session_state:
     if not llm_key or llm_key.strip() == "":
@@ -288,19 +312,24 @@ col_header_left, col_header_right = st.columns([4, 1])
 with col_header_left:
     st.write(f"⏱️ **Last Data Sync:** `{st.session_state['last_fetch_time']}`")
 with col_header_right:
-    if st.button("🔄 Refresh Latest Data", key="refresh_data_btn", use_container_width=True):
-        st.cache_data.clear()
-        st.session_state["last_fetch_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        # Reset statuses and LLM cache
-        if "status_yahoo" in st.session_state:
-            del st.session_state["status_yahoo"]
-        if "status_av" in st.session_state:
-            del st.session_state["status_av"]
-        if "status_llm" in st.session_state:
-            del st.session_state["status_llm"]
-        st.session_state["llm_scores"] = {}
-        st.session_state["llm_reasoning"] = {}
-        st.rerun()
+    if st.session_state.get("user_email") == "bpr.5828@gmail.com":
+        if st.button("🔄 Refresh Latest Data", key="refresh_data_btn", use_container_width=True):
+            st.cache_data.clear()
+            st.session_state["last_fetch_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            # Reset statuses and LLM cache
+            if "status_yahoo" in st.session_state:
+                del st.session_state["status_yahoo"]
+            if "status_av" in st.session_state:
+                del st.session_state["status_av"]
+            if "status_finnhub" in st.session_state:
+                del st.session_state["status_finnhub"]
+            if "status_polygon" in st.session_state:
+                del st.session_state["status_polygon"]
+            if "status_llm" in st.session_state:
+                del st.session_state["status_llm"]
+            st.session_state["llm_scores"] = {}
+            st.session_state["llm_reasoning"] = {}
+            st.rerun()
 
 # ------------------------------------------------------------------------------
 # CONNECTOR STATUS BAR
@@ -308,6 +337,8 @@ with col_header_right:
 def render_status_panel():
     y_text, y_ok, y_msg = st.session_state.get("status_yahoo", ("🟢 Yahoo Finance: Connected", True, ""))
     av_text, av_ok, av_msg = st.session_state.get("status_av", ("🟢 Vintage: Connected", True, ""))
+    fh_text, fh_ok, fh_msg = st.session_state.get("status_finnhub", ("🟢 Finnhub: Connected", True, ""))
+    pol_text, pol_ok, pol_msg = st.session_state.get("status_polygon", ("🟢 Polygon: Connected", True, ""))
     llm_text, llm_ok, llm_msg = st.session_state.get("status_llm", ("🟢 LLM: Configured", True, ""))
     
     def get_status_style(ok):
@@ -318,10 +349,14 @@ def render_status_panel():
             
     y_style = get_status_style(y_ok)
     av_style = get_status_style(av_ok)
+    fh_style = get_status_style(fh_ok)
+    pol_style = get_status_style(pol_ok)
     llm_style = get_status_style(llm_ok)
     
     y_tooltip = f" title=\"{y_msg}\"" if y_msg else ""
     av_tooltip = f" title=\"{av_msg}\"" if av_msg else ""
+    fh_tooltip = f" title=\"{fh_msg}\"" if fh_msg else ""
+    pol_tooltip = f" title=\"{pol_msg}\"" if pol_msg else ""
     llm_tooltip = f" title=\"{llm_msg}\"" if llm_msg else ""
     
     html = f"""
@@ -331,6 +366,12 @@ def render_status_panel():
         </div>
         <div style="{av_style} padding:6px 12px; border-radius:6px; font-size:0.8rem; font-weight:600; cursor:default;"{av_tooltip}>
             {av_text}
+        </div>
+        <div style="{fh_style} padding:6px 12px; border-radius:6px; font-size:0.8rem; font-weight:600; cursor:default;"{fh_tooltip}>
+            {fh_text}
+        </div>
+        <div style="{pol_style} padding:6px 12px; border-radius:6px; font-size:0.8rem; font-weight:600; cursor:default;"{pol_tooltip}>
+            {pol_text}
         </div>
         <div style="{llm_style} padding:6px 12px; border-radius:6px; font-size:0.8rem; font-weight:600; cursor:default;"{llm_tooltip}>
             {llm_text}
@@ -477,6 +518,56 @@ if tickers_to_fetch_yahoo:
                             "time_published": y_time,
                             "url": y_link
                         })
+                            
+                # Finnhub integration
+                if finnhub_key and finnhub_key.strip() != "":
+                    fh_articles = fetch_finnhub_news(ticker_symbol, finnhub_key)
+                    for fh_art in fh_articles:
+                        fh_title = fh_art.get("title", "")
+                        fh_summary = fh_art.get("summary", "")
+                        fh_text = (fh_title + " " + fh_summary).lower()
+                        fh_pos_hits = sum(len(re.findall(r'\b' + re.escape(word) + r'\b', fh_text)) for word in POSITIVE_KEYWORDS)
+                        fh_neg_hits = sum(len(re.findall(r'\b' + re.escape(word) + r'\b', fh_text)) for word in NEGATIVE_KEYWORDS)
+                        fh_net = fh_pos_hits - fh_neg_hits
+                        
+                        fh_matched_pos = {word for word in POSITIVE_KEYWORDS if re.search(r'\b' + re.escape(word) + r'\b', fh_text)}
+                        fh_matched_neg = {word for word in NEGATIVE_KEYWORDS if re.search(r'\b' + re.escape(word) + r'\b', fh_text)}
+                        
+                        if fh_pos_hits > 0 or fh_neg_hits > 0:
+                            if ticker_symbol not in sentiment_map:
+                                sentiment_map[ticker_symbol] = {
+                                    "mention_count": 0, "keyword_score": 0, "articles": [], "pos_words": set(), "neg_words": set()
+                                }
+                            sentiment_map[ticker_symbol]["mention_count"] += 1
+                            sentiment_map[ticker_symbol]["keyword_score"] += fh_net
+                            sentiment_map[ticker_symbol]["pos_words"].update(fh_matched_pos)
+                            sentiment_map[ticker_symbol]["neg_words"].update(fh_matched_neg)
+                            sentiment_map[ticker_symbol]["articles"].append(fh_art)
+                            
+                # Polygon integration
+                if polygon_key and polygon_key.strip() != "":
+                    pol_articles = fetch_polygon_news(ticker_symbol, polygon_key)
+                    for pol_art in pol_articles:
+                        pol_title = pol_art.get("title", "")
+                        pol_summary = pol_art.get("summary", "")
+                        pol_text = (pol_title + " " + pol_summary).lower()
+                        pol_pos_hits = sum(len(re.findall(r'\b' + re.escape(word) + r'\b', pol_text)) for word in POSITIVE_KEYWORDS)
+                        pol_neg_hits = sum(len(re.findall(r'\b' + re.escape(word) + r'\b', pol_text)) for word in NEGATIVE_KEYWORDS)
+                        pol_net = pol_pos_hits - pol_neg_hits
+                        
+                        pol_matched_pos = {word for word in POSITIVE_KEYWORDS if re.search(r'\b' + re.escape(word) + r'\b', pol_text)}
+                        pol_matched_neg = {word for word in NEGATIVE_KEYWORDS if re.search(r'\b' + re.escape(word) + r'\b', pol_text)}
+                        
+                        if pol_pos_hits > 0 or pol_neg_hits > 0:
+                            if ticker_symbol not in sentiment_map:
+                                sentiment_map[ticker_symbol] = {
+                                    "mention_count": 0, "keyword_score": 0, "articles": [], "pos_words": set(), "neg_words": set()
+                                }
+                            sentiment_map[ticker_symbol]["mention_count"] += 1
+                            sentiment_map[ticker_symbol]["keyword_score"] += pol_net
+                            sentiment_map[ticker_symbol]["pos_words"].update(pol_matched_pos)
+                            sentiment_map[ticker_symbol]["neg_words"].update(pol_matched_neg)
+                            sentiment_map[ticker_symbol]["articles"].append(pol_art)
             st.session_state["status_yahoo"] = ("🟢 Yahoo Finance: Connected", True, "Successfully synced Yahoo Finance news and pricing.")
         except Exception as e:
             st.session_state["status_yahoo"] = ("🔴 Yahoo Finance: Failed", False, f"Failed to load Yahoo news: {str(e)}")
