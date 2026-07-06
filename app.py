@@ -667,7 +667,15 @@ if page_choice == "📰 Top Moving Ticker":
                 selected_filter = st.selectbox("Filter by Sector:", filter_options)
             with col_filt2:
                 # Dropdown for sorting
-                sort_option = st.selectbox("Sort by:", ["Keyword Score (High to Low)", "Price (Low to High)", "Price (High to Low)", "Price + Highest +ve Score"])
+                sort_options = [
+                    "Keyword Score (High to Low)",
+                    "Keyword Score (Low to High)",
+                    "Price (High to Low) + Score (High to Low)",
+                    "Price (High to Low) + Score (Low to High)",
+                    "Price (Low to High) + Score (High to Low)",
+                    "Price (Low to High) + Score (Low to High)"
+                ]
+                sort_option = st.selectbox("Sort by:", sort_options)
             
             # Filter screener dataframe based on selection
             if selected_filter == "All Sectors":
@@ -679,13 +687,17 @@ if page_choice == "📰 Top Moving Ticker":
                 
             # Apply sorting
             if sort_option == "Keyword Score (High to Low)":
-                df_sector = df_sector.sort_values(by="Keyword Score", ascending=False).reset_index(drop=True)
-            elif sort_option == "Price (Low to High)":
-                df_sector = df_sector.sort_values(by="Price", ascending=True).reset_index(drop=True)
-            elif sort_option == "Price (High to Low)":
-                df_sector = df_sector.sort_values(by="Price", ascending=False).reset_index(drop=True)
-            elif sort_option == "Price + Highest +ve Score":
+                df_sector = df_sector.sort_values(by=["Keyword Score", "Price"], ascending=[False, False]).reset_index(drop=True)
+            elif sort_option == "Keyword Score (Low to High)":
+                df_sector = df_sector.sort_values(by=["Keyword Score", "Price"], ascending=[True, True]).reset_index(drop=True)
+            elif sort_option == "Price (High to Low) + Score (High to Low)":
                 df_sector = df_sector.sort_values(by=["Price", "Keyword Score"], ascending=[False, False]).reset_index(drop=True)
+            elif sort_option == "Price (High to Low) + Score (Low to High)":
+                df_sector = df_sector.sort_values(by=["Price", "Keyword Score"], ascending=[False, True]).reset_index(drop=True)
+            elif sort_option == "Price (Low to High) + Score (High to Low)":
+                df_sector = df_sector.sort_values(by=["Price", "Keyword Score"], ascending=[True, False]).reset_index(drop=True)
+            elif sort_option == "Price (Low to High) + Score (Low to High)":
+                df_sector = df_sector.sort_values(by=["Price", "Keyword Score"], ascending=[True, True]).reset_index(drop=True)
                 
             df_sector["Rank"] = df_sector.index + 1
             
