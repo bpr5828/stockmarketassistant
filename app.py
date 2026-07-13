@@ -348,113 +348,82 @@ def clear_cache_for(source):
 # ------------------------------------------------------------------------------
 # STEP 1: Load News Feed & Process Positive Sentiment Tickers
 # ------------------------------------------------------------------------------
-news_feed_ok = False
-news_feed_data = {}
 
-if not av_key or av_key.strip() == "":
-    err_msg = "Alpha Vantage API Key is missing from the .env file. Please configure ALPHA_VANTAGE_API_KEY to run Alpha Vantage news scanner."
-    st.warning(f"⚠️ Alpha Vantage: {err_msg}")
-    st.session_state["status_av"] = ("🔴 Vintage: Key Missing", False, err_msg)
-else:
-    with st.spinner("⚡ Scanning live Alpha Vantage market news feed..."):
+@st.cache_data(show_spinner=False, ttl=3600)
+def build_screener_data(av_key, finnhub_key, polygon_key, pos_keywords, neg_keywords):
+    sentiment_map = {}
+    statuses = {}
+    
+    if not av_key or av_key.strip() == "":
+        err_msg = "Alpha Vantage API Key is missing from the .env file. Please configure ALPHA_VANTAGE_API_KEY to run Alpha Vantage news scanner."
+        statuses["av"] = ("🔴 Vintage: Key Missing", False, err_msg)
+        news_feed_ok = False
+    else:
         try:
             news_feed_data = fetch_news_sentiment(av_key, ticker=None)
             news_feed_ok = True
-            st.session_state["status_av"] = ("🟢 Vintage: Connected", True, "Alpha Vantage key configured successfully.")
+            statuses["av"] = ("🟢 Vintage: Connected", True, "Alpha Vantage key configured successfully.")
         except Exception as e:
             err_msg = str(e)
-            st.error(f"❌ Alpha Vantage news feed load failed: {err_msg}")
-            st.session_state["status_av"] = ("🔴 Vintage: Fetch Failed", False, err_msg)
+            statuses["av"] = ("🔴 Vintage: Fetch Failed", False, err_msg)
+            news_feed_ok = False
 
-# Initialize sentiment_map
-sentiment_map = {}
-
-# Process Alpha Vantage Tickers if news is available
-if news_feed_ok:
-    articles = news_feed_data.get("feed", [])
-    for art in articles:
-        title = art.get("title", "")
-        summary = art.get("summary", "")
-        text_to_search = (title + " " + summary).lower()
-        
-        # Calculate positive and negative keyword hits in AV Article
-        av_pos_hits = sum(len(re.findall(r'\b' + re.escape(word) + r'\b', text_to_search)) for word in POSITIVE_KEYWORDS)
-        av_neg_hits = sum(len(re.findall(r'\b' + re.escape(word) + r'\b', text_to_search)) for word in NEGATIVE_KEYWORDS)
-        av_net = av_pos_hits - av_neg_hits
-        
-        # Track which words matched
-        matched_pos_set = {word for word in POSITIVE_KEYWORDS if re.search(r'\b' + re.escape(word) + r'\b', text_to_search)}
-        matched_neg_set = {word for word in NEGATIVE_KEYWORDS if re.search(r'\b' + re.escape(word) + r'\b', text_to_search)}
-        
-        # Scan tickers mentioned in this article
-        ticker_sentiment_list = art.get("ticker_sentiment", [])
-        for tick_item in ticker_sentiment_list:
-            ticker_symbol = tick_item.get("ticker", "").upper()
+    if news_feed_ok:
+        articles = news_feed_data.get("feed", [])
+        for art in articles:
+            title = art.get("title", "")
+            summary = art.get("summary", "")
+            text_to_search = (title + " " + summary).lower()
             
-            # Clean up exchange prefixes (e.g. NYSE:AAPL -> AAPL)
-            if ":" in ticker_symbol:
-                ticker_symbol = ticker_symbol.split(":")[-1]
-                
-            # Filter standard US stock symbol format
-            if re.match(r"^[A-Z\-]{1,6}$", ticker_symbol) and (av_pos_hits > 0 or av_neg_hits > 0):
-                if ticker_symbol not in sentiment_map:
-                    sentiment_map[ticker_symbol] = {
-                        "mention_count": 0,
-                        "keyword_score": 0,
-                        "articles": [],
-                        "pos_words": set(),
-                        "neg_words": set()
-                    }
-                sentiment_map[ticker_symbol]["mention_count"] += 1
-                sentiment_map[ticker_symbol]["keyword_score"] += av_net
-                sentiment_map[ticker_symbol]["pos_words"].update(matched_pos_set)
-                sentiment_map[ticker_symbol]["neg_words"].update(matched_neg_set)
-                sentiment_map[ticker_symbol]["articles"].append({
-                    "title": title,
-                    "summary": summary,
-                    "source": art.get("source", "Alpha Vantage"),
-                    "time_published": art.get("time_published", ""),
-                    "url": art.get("url", "#")
-                })
+            av_pos_hits = sum(len(re.findall(r'\b' + re.escape(word) + r'\b', text_to_search)) for word in pos_keywords)
+            av_neg_hits = sum(len(re.findall(r'\b' + re.escape(word) + r'\b', text_to_search)) for word in neg_keywords)
+            av_net = av_pos_hits - av_neg_hits
+            
+            matched_pos_set = {word for word in pos_keywords if re.search(r'\b' + re.escape(word) + r'\b', text_to_search)}
+            matched_neg_set = {word for word in neg_keywords if re.search(r'\b' + re.escape(word) + r'\b', text_to_search)}
+            
+            ticker_sentiment_list = art.get("ticker_sentiment", [])
+            for tick_item in ticker_sentiment_list:
+                ticker_symbol = tick_item.get("ticker", "").upper()
+                if ":" in ticker_symbol:
+                    ticker_symbol = ticker_symbol.split(":")[-1]
+                    
+                if re.match(r"^[A-Z\-]{1,6}$", ticker_symbol) and (av_pos_hits > 0 or av_neg_hits > 0):
+                    if ticker_symbol not in sentiment_map:
+                        sentiment_map[ticker_symbol] = {
+                            "mention_count": 0, "keyword_score": 0, "articles": [], "pos_words": set(), "neg_words": set()
+                        }
+                    sentiment_map[ticker_symbol]["mention_count"] += 1
+                    sentiment_map[ticker_symbol]["keyword_score"] += av_net
+                    sentiment_map[ticker_symbol]["pos_words"].update(matched_pos_set)
+                    sentiment_map[ticker_symbol]["neg_words"].update(matched_neg_set)
+                    sentiment_map[ticker_symbol]["articles"].append({
+                        "title": title, "summary": summary, "source": art.get("source", "Alpha Vantage"),
+                        "time_published": art.get("time_published", ""), "url": art.get("url", "#")
+                    })
 
-# Determine which tickers to fetch on Yahoo Finance, Finnhub, and Polygon:
-# Always scan the full BENCHMARK_TICKERS list (220 tickers) plus any extras found in AV
-tickers_to_fetch_yahoo = list(set(list(sentiment_map.keys()) + BENCHMARK_TICKERS))
-
-# Pre-initialize sentiment map for all tickers so they appear in the UI even with 0 mentions
-for t in tickers_to_fetch_yahoo:
-    if t not in sentiment_map:
-        sentiment_map[t] = {
-            "mention_count": 0, "keyword_score": 0, "articles": [], "pos_words": set(), "neg_words": set()
-        }
-
-if tickers_to_fetch_yahoo:
-    yahoo_spinner_msg = f"Scanning {len(tickers_to_fetch_yahoo)} tickers across Yahoo Finance, Finnhub, & Polygon..."
-    with st.spinner(f"💼 {yahoo_spinner_msg}"):
+    # Only fetch additional news for active tickers found in the AV live feed
+    active_tickers = list(sentiment_map.keys())
+    
+    if active_tickers:
         try:
-            for ticker_symbol in tickers_to_fetch_yahoo:
+            for ticker_symbol in active_tickers:
+                # Yahoo
                 yahoo_articles = fetch_yahoo_news(ticker_symbol)
                 for y_art in yahoo_articles:
-                    if not isinstance(y_art, dict):
-                        continue
+                    if not isinstance(y_art, dict): continue
                     content_dict = y_art.get("content", {})
-                    if not content_dict:
-                        continue
-                        
+                    if not content_dict: continue
                     y_title = content_dict.get("title") or ""
-                    
                     provider_dict = content_dict.get("provider") or {}
                     y_publisher = provider_dict.get("displayName") or "Yahoo Finance"
-                    
                     click_through = content_dict.get("clickThroughUrl") or {}
                     y_link = click_through.get("url") or "#"
                     if y_link == "#":
                         canonical = content_dict.get("canonicalUrl") or {}
                         y_link = canonical.get("url") or "#"
-                        
                     y_time_raw = content_dict.get("pubDate") or ""
                     y_summary = content_dict.get("summary") or "Full story available at source link."
-                    
                     y_time = ""
                     if y_time_raw:
                         try:
@@ -462,52 +431,41 @@ if tickers_to_fetch_yahoo:
                             y_time = dt.strftime("%Y%m%dT%H%M%S")
                         except Exception:
                             y_time = y_time_raw
-                            
-                    # Calculate Keyword hits in Yahoo news title or summary
-                    y_text = (y_title + " " + y_summary).lower()
-                    y_pos_hits = sum(len(re.findall(r'\b' + re.escape(word) + r'\b', y_text)) for word in POSITIVE_KEYWORDS)
-                    y_neg_hits = sum(len(re.findall(r'\b' + re.escape(word) + r'\b', y_text)) for word in NEGATIVE_KEYWORDS)
-                    y_net = y_pos_hits - y_neg_hits
                     
-                    y_matched_pos = {word for word in POSITIVE_KEYWORDS if re.search(r'\b' + re.escape(word) + r'\b', y_text)}
-                    y_matched_neg = {word for word in NEGATIVE_KEYWORDS if re.search(r'\b' + re.escape(word) + r'\b', y_text)}
+                    y_text = (y_title + " " + y_summary).lower()
+                    y_pos_hits = sum(len(re.findall(r'\b' + re.escape(word) + r'\b', y_text)) for word in pos_keywords)
+                    y_neg_hits = sum(len(re.findall(r'\b' + re.escape(word) + r'\b', y_text)) for word in neg_keywords)
+                    y_net = y_pos_hits - y_neg_hits
+                    y_matched_pos = {word for word in pos_keywords if re.search(r'\b' + re.escape(word) + r'\b', y_text)}
+                    y_matched_neg = {word for word in neg_keywords if re.search(r'\b' + re.escape(word) + r'\b', y_text)}
                     
                     if y_pos_hits > 0 or y_neg_hits > 0:
                         if ticker_symbol not in sentiment_map:
                             sentiment_map[ticker_symbol] = {
-                                "mention_count": 0,
-                                "keyword_score": 0,
-                                "articles": [],
-                                "pos_words": set(),
-                                "neg_words": set()
+                                "mention_count": 0, "keyword_score": 0, "articles": [], "pos_words": set(), "neg_words": set()
                             }
                         sentiment_map[ticker_symbol]["mention_count"] += 1
                         sentiment_map[ticker_symbol]["keyword_score"] += y_net
                         sentiment_map[ticker_symbol]["pos_words"].update(y_matched_pos)
                         sentiment_map[ticker_symbol]["neg_words"].update(y_matched_neg)
                         sentiment_map[ticker_symbol]["articles"].append({
-                            "title": y_title,
-                            "summary": y_summary,
-                            "source": y_publisher,
-                            "time_published": y_time,
-                            "url": y_link
+                            "title": y_title, "summary": y_summary, "source": y_publisher,
+                            "time_published": y_time, "url": y_link
                         })
                             
-                # Finnhub integration
+                # Finnhub
                 if finnhub_key and finnhub_key.strip() != "":
                     fh_articles = fetch_finnhub_news(ticker_symbol, finnhub_key)
                     for fh_art in fh_articles:
-                        if not isinstance(fh_art, dict):
-                            continue
+                        if not isinstance(fh_art, dict): continue
                         fh_title = fh_art.get("title") or ""
                         fh_summary = fh_art.get("summary") or ""
                         fh_text = (fh_title + " " + fh_summary).lower()
-                        fh_pos_hits = sum(len(re.findall(r'\b' + re.escape(word) + r'\b', fh_text)) for word in POSITIVE_KEYWORDS)
-                        fh_neg_hits = sum(len(re.findall(r'\b' + re.escape(word) + r'\b', fh_text)) for word in NEGATIVE_KEYWORDS)
+                        fh_pos_hits = sum(len(re.findall(r'\b' + re.escape(word) + r'\b', fh_text)) for word in pos_keywords)
+                        fh_neg_hits = sum(len(re.findall(r'\b' + re.escape(word) + r'\b', fh_text)) for word in neg_keywords)
                         fh_net = fh_pos_hits - fh_neg_hits
-                        
-                        fh_matched_pos = {word for word in POSITIVE_KEYWORDS if re.search(r'\b' + re.escape(word) + r'\b', fh_text)}
-                        fh_matched_neg = {word for word in NEGATIVE_KEYWORDS if re.search(r'\b' + re.escape(word) + r'\b', fh_text)}
+                        fh_matched_pos = {word for word in pos_keywords if re.search(r'\b' + re.escape(word) + r'\b', fh_text)}
+                        fh_matched_neg = {word for word in neg_keywords if re.search(r'\b' + re.escape(word) + r'\b', fh_text)}
                         
                         if fh_pos_hits > 0 or fh_neg_hits > 0:
                             if ticker_symbol not in sentiment_map:
@@ -520,21 +478,19 @@ if tickers_to_fetch_yahoo:
                             sentiment_map[ticker_symbol]["neg_words"].update(fh_matched_neg)
                             sentiment_map[ticker_symbol]["articles"].append(fh_art)
                             
-                # Polygon integration
+                # Polygon
                 if polygon_key and polygon_key.strip() != "":
                     pol_articles = fetch_polygon_news(ticker_symbol, polygon_key)
                     for pol_art in pol_articles:
-                        if not isinstance(pol_art, dict):
-                            continue
+                        if not isinstance(pol_art, dict): continue
                         pol_title = pol_art.get("title") or ""
                         pol_summary = pol_art.get("summary") or ""
                         pol_text = (pol_title + " " + pol_summary).lower()
-                        pol_pos_hits = sum(len(re.findall(r'\b' + re.escape(word) + r'\b', pol_text)) for word in POSITIVE_KEYWORDS)
-                        pol_neg_hits = sum(len(re.findall(r'\b' + re.escape(word) + r'\b', pol_text)) for word in NEGATIVE_KEYWORDS)
+                        pol_pos_hits = sum(len(re.findall(r'\b' + re.escape(word) + r'\b', pol_text)) for word in pos_keywords)
+                        pol_neg_hits = sum(len(re.findall(r'\b' + re.escape(word) + r'\b', pol_text)) for word in neg_keywords)
                         pol_net = pol_pos_hits - pol_neg_hits
-                        
-                        pol_matched_pos = {word for word in POSITIVE_KEYWORDS if re.search(r'\b' + re.escape(word) + r'\b', pol_text)}
-                        pol_matched_neg = {word for word in NEGATIVE_KEYWORDS if re.search(r'\b' + re.escape(word) + r'\b', pol_text)}
+                        pol_matched_pos = {word for word in pos_keywords if re.search(r'\b' + re.escape(word) + r'\b', pol_text)}
+                        pol_matched_neg = {word for word in neg_keywords if re.search(r'\b' + re.escape(word) + r'\b', pol_text)}
                         
                         if pol_pos_hits > 0 or pol_neg_hits > 0:
                             if ticker_symbol not in sentiment_map:
@@ -546,9 +502,32 @@ if tickers_to_fetch_yahoo:
                             sentiment_map[ticker_symbol]["pos_words"].update(pol_matched_pos)
                             sentiment_map[ticker_symbol]["neg_words"].update(pol_matched_neg)
                             sentiment_map[ticker_symbol]["articles"].append(pol_art)
-            st.session_state["status_yahoo"] = ("🟢 Yahoo Finance: Connected", True, "Successfully synced Yahoo Finance news and pricing.")
+                            
+            statuses["yahoo"] = ("🟢 Yahoo Finance: Connected", True, "Successfully synced Yahoo Finance news and pricing.")
+            if finnhub_key and finnhub_key.strip() != "":
+                statuses["finnhub"] = ("🟢 Finnhub: Connected", True, "Finnhub key configured successfully.")
+            else:
+                statuses["finnhub"] = ("🔴 Finnhub: Key Missing", False, "Finnhub API Key is missing from the .env file.")
+            if polygon_key and polygon_key.strip() != "":
+                statuses["polygon"] = ("🟢 Polygon: Connected", True, "Polygon key configured successfully.")
+            else:
+                statuses["polygon"] = ("🔴 Polygon: Key Missing", False, "Polygon API Key is missing from the .env file.")
         except Exception as e:
-            st.session_state["status_yahoo"] = ("🔴 Yahoo Finance: Failed", False, f"Failed to load Yahoo news: {str(e)}")
+            statuses["yahoo"] = ("🔴 Yahoo Finance: Failed", False, f"Failed to load Yahoo news: {str(e)}")
+
+    return sentiment_map, statuses
+
+with st.spinner("⚡ Scanning live market news and extracting active tickers..."):
+    sentiment_map, statuses = build_screener_data(
+        av_key, finnhub_key, polygon_key, tuple(POSITIVE_KEYWORDS), tuple(NEGATIVE_KEYWORDS)
+    )
+
+# Apply statuses to session_state
+for k, v in statuses.items():
+    st.session_state[f"status_{k}"] = v
+
+if not sentiment_map:
+    st.warning("⚠️ No active tickers found. Waiting for new market news...")
 
 # Build a Screener Dataframe from sentiment map
 screener_list = []
