@@ -581,6 +581,19 @@ if not df_screener.empty:
 else:
     df_screener = pd.DataFrame(columns=["Rank", "Ticker", "Company Name", "Mentions", "Keyword Score", "Price", "LLM Score", "Matched Keywords"])
 
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 🔍 Filter Tickers")
+selected_tickers = st.sidebar.multiselect(
+    "Search and select tickers to filter...",
+    options=df_screener["Ticker"].unique() if not df_screener.empty else [],
+    default=[],
+    help="Type a ticker symbol (e.g. AAPL) to filter the dashboard. Leave empty to show all."
+)
+
+if selected_tickers:
+    df_screener = df_screener[df_screener["Ticker"].isin(selected_tickers)].reset_index(drop=True)
+    df_screener["Rank"] = df_screener.index + 1
+
 # Helper to highlight matching keywords in text (case-insensitive)
 def highlight_keywords(text, pos_kws, neg_kws):
     highlighted = text
