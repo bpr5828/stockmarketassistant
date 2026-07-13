@@ -597,18 +597,7 @@ if page_choice == "🏠 Home":
         - **Financial Analysts:** Needing an automated tool to scrape, summarize, and score thousands of articles daily to find hidden gems.
         """)
         
-if page_choice in ["📰 Top Moving Ticker", "📈 Ticker Trend & Chart", "💬 Mentioned Articles"]:
-    st.markdown("### 🔍 Filter Tickers")
-    selected_tickers = st.multiselect(
-        "Search and select tickers to filter the views below...",
-        options=df_screener["Ticker"].unique() if not df_screener.empty else [],
-        default=[],
-        help="Type a ticker symbol (e.g. AAPL) to filter the dashboard. Leave empty to show all."
-    )
-    
-    if selected_tickers:
-        df_screener = df_screener[df_screener["Ticker"].isin(selected_tickers)].reset_index(drop=True)
-        df_screener["Rank"] = df_screener.index + 1
+
 
 # Helper to highlight matching keywords in text (case-insensitive)
 def highlight_keywords(text, pos_kws, neg_kws):
@@ -635,9 +624,6 @@ if page_choice == "📰 Top Moving Ticker":
     if df_screener.empty:
         st.info("💡 No tickers available.")
     else:
-        # Create tabs based on price
-        tab_under_10, tab_10_50, tab_50_100, tab_over_100 = st.tabs(["< $10", "$10 - $50", "$50 - $100", "$100+"])
-        
         def render_category(df_cat, cat_name):
             if df_cat.empty:
                 st.info(f"No tickers found in {cat_name}.")
@@ -705,14 +691,30 @@ if page_choice == "📰 Top Moving Ticker":
                 end_display = min(total_items, current_page * ITEMS_PER_PAGE)
                 st.markdown(f"<div style='padding-top: 35px; color: #A0AEC0; font-weight: 500;'>Showing {start_display} - {end_display} of {total_items} tickers</div>", unsafe_allow_html=True)
         
-        with tab_under_10:
-            render_category(df_screener[(df_screener["Price"] > 0) & (df_screener["Price"] < 10)], "< $10")
-        with tab_10_50:
-            render_category(df_screener[(df_screener["Price"] >= 10) & (df_screener["Price"] < 50)], "$10 - $50")
-        with tab_50_100:
-            render_category(df_screener[(df_screener["Price"] >= 50) & (df_screener["Price"] < 100)], "$50 - $100")
-        with tab_over_100:
-            render_category(df_screener[(df_screener["Price"] >= 100) | (df_screener["Price"] == 0)], "$100+")
+        st.markdown("### 🔍 Filter Tickers")
+        selected_tickers = st.multiselect(
+            "Search and select tickers to bypass price filters...",
+            options=df_screener["Ticker"].unique(),
+            default=[],
+            help="Type a ticker symbol (e.g. AAPL) to view it directly."
+        )
+        
+        if selected_tickers:
+            df_filtered = df_screener[df_screener["Ticker"].isin(selected_tickers)].reset_index(drop=True)
+            df_filtered["Rank"] = df_filtered.index + 1
+            render_category(df_filtered, "Selected Tickers")
+        else:
+            # Create tabs based on price
+            tab_under_10, tab_10_50, tab_50_100, tab_over_100 = st.tabs(["< $10", "$10 - $50", "$50 - $100", "$100+"])
+            
+            with tab_under_10:
+                render_category(df_screener[(df_screener["Price"] > 0) & (df_screener["Price"] < 10)], "< $10")
+            with tab_10_50:
+                render_category(df_screener[(df_screener["Price"] >= 10) & (df_screener["Price"] < 50)], "$10 - $50")
+            with tab_50_100:
+                render_category(df_screener[(df_screener["Price"] >= 50) & (df_screener["Price"] < 100)], "$50 - $100")
+            with tab_over_100:
+                render_category(df_screener[(df_screener["Price"] >= 100) | (df_screener["Price"] == 0)], "$100+")
 
 # ------------------------------------------------------------------------------
 # VIEW 2: TICKER TREND & CHART
