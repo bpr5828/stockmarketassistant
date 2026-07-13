@@ -581,18 +581,32 @@ if not df_screener.empty:
 else:
     df_screener = pd.DataFrame(columns=["Rank", "Ticker", "Company Name", "Mentions", "Keyword Score", "Price", "LLM Score", "Matched Keywords"])
 
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 🔍 Filter Tickers")
-selected_tickers = st.sidebar.multiselect(
-    "Search and select tickers to filter...",
-    options=df_screener["Ticker"].unique() if not df_screener.empty else [],
-    default=[],
-    help="Type a ticker symbol (e.g. AAPL) to filter the dashboard. Leave empty to show all."
-)
-
-if selected_tickers:
-    df_screener = df_screener[df_screener["Ticker"].isin(selected_tickers)].reset_index(drop=True)
-    df_screener["Rank"] = df_screener.index + 1
+if page_choice != "🔌 Data Source Status":
+    st.markdown("""
+    # 📈 Stock Analyst
+    **Stock Analyst** is a real-time, AI-powered financial dashboard designed to help day traders, retail investors, and financial analysts discover trending stocks *before* they break out. 
+    
+    Instead of relying on lagging price indicators, this tool aggregates live market news across **Alpha Vantage**, **Yahoo Finance**, **Finnhub**, and **Polygon.io** to instantly identify which companies are capturing media attention. It runs on-the-fly sentiment analysis to score articles using custom positive/negative keyword targeting, and leverages Large Language Models to provide on-demand, deep-dive sentiment grading.
+    """)
+    
+    with st.expander("🎯 Who is this for?"):
+        st.markdown("""
+        - **Day Traders & Swing Traders:** Looking for high-momentum plays driven by breaking news.
+        - **Retail Investors:** Wanting a consolidated view of market sentiment without checking multiple news platforms.
+        - **Financial Analysts:** Needing an automated tool to scrape, summarize, and score thousands of articles daily to find hidden gems.
+        """)
+        
+    st.markdown("### 🔍 Filter Tickers")
+    selected_tickers = st.multiselect(
+        "Search and select tickers to filter the views below...",
+        options=df_screener["Ticker"].unique() if not df_screener.empty else [],
+        default=[],
+        help="Type a ticker symbol (e.g. AAPL) to filter the dashboard. Leave empty to show all."
+    )
+    
+    if selected_tickers:
+        df_screener = df_screener[df_screener["Ticker"].isin(selected_tickers)].reset_index(drop=True)
+        df_screener["Rank"] = df_screener.index + 1
 
 # Helper to highlight matching keywords in text (case-insensitive)
 def highlight_keywords(text, pos_kws, neg_kws):
